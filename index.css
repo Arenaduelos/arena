@@ -1,0 +1,119 @@
+/* --- FUNDO E CORPO --- */
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #000 url('https://img.freepik.com/fotos-premium/fundo-da-parede-de-pedra-do-castelo-medieval_717440-1044.jpg') no-repeat center center fixed;
+    background-size: cover;
+    font-family: 'Cinzel', serif; /* Uma fonte com estilo medieval (serifada) */
+    color: #f1e5ac;
+}
+
+/* --- CONTAINER PRINCIPAL (PERGAMINHO) --- */
+.login-container {
+    background: #c2a679; /* Cor de papel envelhecido */
+    padding: 40px;
+    border: 10px solid #3d2b1f; /* Moldura de madeira escura */
+    border-image: url('https://www.transparentpng.com/download/border/9O0Zz1-wooden-border-frame-transparent.png') 30 stretch;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0,0,0,0.3);
+    width: 350px;
+    text-align: center;
+    position: relative;
+    border-radius: 5px;
+}
+
+/* Efeito de papel queimado nas bordas */
+.login-container::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
+    pointer-events: none;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: #3d2b1f;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.3);
+    letter-spacing: 3px;
+    border-bottom: 2px solid #3d2b1f;
+}
+
+/* --- FORMULÁRIO --- */
+.form-group {
+    margin-bottom: 25px;
+    text-align: left;
+}
+
+label {
+    display: block;
+    color: #2c1e14;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+input[type="text"], input[type="password"], input[type="email"] {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid #3d2b1f;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 1rem;
+    color: #1a0f08;
+    box-sizing: border-box;
+    transition: 0.3s;
+}
+
+input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 10px #8b4513;
+}
+
+/* --- BOTÃO (ESTILO ESCUDO/FERRO) --- */
+.btn-entrar {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(to bottom, #4a4a4a 0%, #2a2a2a 100%);
+    color: #ffd700;
+    border: 2px solid #ffd700;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #000;
+    transition: all 0.2s;
+    margin-top: 10px;
+}
+
+.btn-entrar:hover {
+    background: linear-gradient(to bottom, #5a5a5a 0%, #3a3a3a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #000;
+}
+
+.btn-entrar:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #000;
+}
+
+/* --- DETALHES DECORATIVOS --- */
+.decorative-icon {
+    font-size: 2rem;
+    margin: 10px 0;
+    color: #3d2b1f;
+}
+
+footer {
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: #5d4433;
+    font-style: italic;
+}

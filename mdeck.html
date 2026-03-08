@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Montar Deck</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="mdeck.css">
+</head>
+<body>
+    <div class="deck-container">
+        <div class="deck-toolbar">
+            <button class="toolbar-btn" onclick="window.location.href='logado.html'">IR PARA A ARENA ⚔️</button>
+            <button class="toolbar-btn" onclick="window.location.href='conquistas.html'">CONQUISTAS</button>
+            <span id="statsJogador"></span>
+        </div>
+        <div class="builder-row">
+            <div class="panel">
+                <div class="panel-title">MEU DECK (24 CARTAS)</div>
+                <div class="deck-editor">
+                    <div class="deck-info">
+                        <span id="deckCount"></span>
+                        <button class="toolbar-btn" onclick="window.location.href='logado.html'">Entrar na Arena</button>
+                        <button id="btnSalvarDeck" class="toolbar-btn" disabled>Salvar Deck</button>
+                    </div>
+                    <div class="deck-slots" id="deckSlots"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">CARTAS DISPONÍVEIS</div>
+                <div class="deck-grid" id="listaCartas"></div>
+            </div>
+        </div>
+    </div>
+<script>
+const nome = localStorage.getItem("usuarioLogado");
+if (!nome) { window.location.href = "index.html"; }
+const inventario = JSON.parse(localStorage.getItem(`deck_inventory_${nome}`)) || JSON.parse(localStorage.getItem(`deck_${nome}`)) || [];
+let nivel = parseInt(localStorage.getItem(`nivel_${nome}`)) || 1;
+let moedas = parseInt(localStorage.getItem(`moedas_${nome}`)) || 0;
+document.getElementById("statsJogador").innerHTML = `Jogador: ${nome} | Nível: ${nivel} | 💰 ${moedas}`;
+const deckMax = 24;
+let deckAtual = Array(deckMax).fill(null);
+function monstro(nome, imagem, ataque, defesa) { return { nome, imagem, tipo: "monstro", ataque, defesa }; }
+function especial(nome, imagem, efeito) { return { nome, imagem, tipo: "especial", efeito }; }
+const catalogo = [
+    monstro("Guerreiro", "imagens/guerreiros/guerreiro1.jpg", 800, 600),
+    monstro("Guerreiro", "imagens/guerreiros/guerreiro2.jpg", 1000, 700),
+    monstro("Guerreiro", "imagens/guerreiros/guerreiro3.jpg", 1200, 800),
+    monstro("Guerreiro", "imagens/guerreiros/guerreiro4.jpg", 1300, 600),
+    monstro("Guerreiro", "imagens/guerreiros/guerreiro5.jpg", 1500, 800),
+    monstro("Orc", "imagens/orcs/orc1.jpg", 900, 700),
+    monstro("Orc", "imagens/orcs/orc2.jpg", 1100, 750),
+    monstro("Orc", "imagens/orcs/orc3.jpg", 1250, 750),
+    monstro("Orc", "imagens/orcs/orc4.jpg", 1350, 800),
+    monstro("Orc", "imagens/orcs/orc5.jpg", 1800, 900),
+    monstro("Troll", "imagens/trolls/troll1.jpg", 1000, 800),
+    monstro("Troll", "imagens/trolls/troll2.jpg", 1100, 800),
+    monstro("Troll", "imagens/trolls/troll3.jpg", 1250, 800),
+    monstro("Troll", "imagens/trolls/troll4.jpg", 1450, 900),
+    monstro("Troll", "imagens/trolls/troll5.jpg", 2000, 1000),
+    monstro("Gigante", "imagens/gigantes/gigante1.jpg", 1050, 800),
+    monstro("Gigante", "imagens/gigantes/gigante2.jpg", 1150, 800),
+    monstro("Gigante", "imagens/gigantes/gigante3.jpg", 1500, 900),
+    monstro("Gigante", "imagens/gigantes/gigante4.jpg", 1600, 900),
+    monstro("Gigante", "imagens/gigantes/gigante5.jpg", 2050, 1000),
+    monstro("Ogro", "imagens/ogros/ogro1.jpg", 1200, 1000),
+    monstro("Ogro", "imagens/ogros/ogro2.jpg", 1300, 1000),
+    monstro("Ogro", "imagens/ogros/ogro3.jpg", 1600, 1050),
+    monstro("Ogro", "imagens/ogros/ogro4.jpg", 1650, 1050),
+    monstro("Ogro", "imagens/ogros/ogro5.jpg", 2100, 1100),
+    monstro("Morte", "imagens/mortes/morte1.jpg", 1300, 1100),
+    monstro("Morte", "imagens/mortes/morte2.jpg", 1350, 1100),
+    monstro("Morte", "imagens/mortes/morte3.jpg", 1700, 1200),
+    monstro("Morte", "imagens/mortes/morte4.jpg", 1750, 1200),
+    monstro("Morte", "imagens/mortes/morte5.jpg", 2200, 1250),
+    monstro("Fada", "imagens/fadas/fada1.jpg", 1350, 1150),
+    monstro("Fada", "imagens/fadas/fada2.jpg", 1400, 1200),
+    monstro("Fada", "imagens/fadas/fada3.jpg", 1800, 1300),
+    monstro("Fada", "imagens/fadas/fada4.jpg", 1850, 1300),
+    monstro("Fada", "imagens/fadas/fada5.jpg", 2300, 1350),
+    monstro("Dragão", "imagens/dragoes/dragao1.jpg", 1500, 1500),
+    monstro("Dragão", "imagens/dragoes/dragao2.jpg", 1600, 1500),
+    monstro("Dragão", "imagens/dragoes/dragao3.jpg", 1850, 1550),
+    monstro("Dragão", "imagens/dragoes/dragao4.jpg", 1900, 1550),
+    monstro("Dragão", "imagens/dragoes/dragao5.jpg", 2350, 1550),
+    monstro("Mago", "imagens/magos/mago1.jpg", 1700, 1600),
+    monstro("Mago", "imagens/magos/mago2.jpg", 1800, 1600),
+    monstro("Mago", "imagens/magos/mago3.jpg", 1900, 1600),
+    monstro("Mago", "imagens/magos/mago4.jpg", 1950, 1650),
+    monstro("Mago", "imagens/magos/mago5.jpg", 2500, 1700),
+    especial("Bloqueio", "imagens/especiais/bloqueio.jpg", "bloqueio"),
+    especial("Chamado", "imagens/especiais/chamado.jpg", "chamado"),
+    especial("Despertar", "imagens/especiais/despertar.jpg", "despertar"),
+    especial("Power Up", "imagens/especiais/powerup.jpg", "aumenta500"),
+    especial("Power Down", "imagens/especiais/powerdown.jpg", "diminui500"),
+    especial("Trocal", "imagens/especiais/trocal.jpg", "fusao"),
+    especial("Fusão", "imagens/especiais/fusao.jpg", "fusao"),
+    especial("Vida", "imagens/especiais/vida.jpg", "vida")
+];
+const quantidadePorImagem = {};
+inventario.forEach(c => {
+    const k = c.imagem;
+    quantidadePorImagem[k] = (quantidadePorImagem[k] || 0) + 1;
+});
+deckAtual.forEach(c => {
+    if (c) {
+        const k = c.imagem;
+        quantidadePorImagem[k] = Math.max(0, (quantidadePorImagem[k] || 0) - 1);
+    }
+});
+function salvarDeck() {
+    localStorage.setItem(`deck_build_${nome}`, JSON.stringify(deckAtual));
+}
+function canUse(imagem) {
+    return (quantidadePorImagem[imagem] || 0) > 0;
+}
+function renderSlots() {
+    const slots = document.getElementById("deckSlots");
+    slots.innerHTML = "";
+    // Permite soltar diretamente no painel para preencher o primeiro slot vazio
+    slots.addEventListener("dragover", e => { e.preventDefault(); });
+    slots.addEventListener("drop", e => {
+        e.preventDefault();
+        const data = e.dataTransfer.getData("text/plain");
+        if (!data) return;
+        const card = JSON.parse(data);
+        const idxLivre = deckAtual.findIndex(x => x === null);
+        if (idxLivre === -1) { alert("Seu deck está completo com 24 cartas."); return; }
+        if (!canUse(card.imagem)) return;
+        deckAtual[idxLivre] = card.tipo === "monstro"
+            ? { nome: card.nome, imagem: card.imagem, tipo: "monstro", ataque: card.ataque, defesa: card.defesa, nivel: card.nivel || 1 }
+            : { nome: card.nome, imagem: card.imagem, tipo: "especial", efeito: card.efeito };
+        quantidadePorImagem[card.imagem]--;
+        salvarDeck();
+        renderSlots();
+        renderCatalogo();
+    });
+    for (let i = 0; i < deckMax; i++) {
+        const s = document.createElement("div");
+        s.className = "deck-slot";
+        s.dataset.index = i;
+        s.addEventListener("dragover", e => { e.preventDefault(); });
+        s.addEventListener("drop", e => {
+            e.preventDefault();
+            const data = e.dataTransfer.getData("text/plain");
+            if (!data) return;
+            if (deckAtual[i]) return;
+            const card = JSON.parse(data);
+            if (!canUse(card.imagem)) return;
+            deckAtual[i] = card.tipo === "monstro"
+                ? { nome: card.nome, imagem: card.imagem, tipo: "monstro", ataque: card.ataque, defesa: card.defesa, nivel: card.nivel || 1 }
+                : { nome: card.nome, imagem: card.imagem, tipo: "especial", efeito: card.efeito };
+            quantidadePorImagem[card.imagem]--;
+            salvarDeck();
+            renderSlots();
+            renderCatalogo();
+        });
+        s.addEventListener("click", () => {
+            if (deckAtual[i]) {
+                const img = deckAtual[i].imagem;
+                quantidadePorImagem[img] = (quantidadePorImagem[img] || 0) + 1;
+                deckAtual[i] = null;
+                salvarDeck();
+                renderSlots();
+                renderCatalogo();
+            }
+        });
+        if (deckAtual[i]) {
+            const img = document.createElement("img");
+            img.src = deckAtual[i].imagem;
+            img.setAttribute("draggable", "true");
+            img.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("text/plain", JSON.stringify({ fromSlot: i, card: deckAtual[i] }));
+            });
+            s.appendChild(img);
+        }
+        slots.appendChild(s);
+    }
+    const filled = deckAtual.filter(Boolean).length;
+    document.getElementById("deckCount").innerText = `Cartas no deck: ${filled}/${deckMax}`;
+    const btn = document.getElementById("btnSalvarDeck");
+    if (btn) btn.disabled = filled !== deckMax;
+}
+function renderCatalogo() {
+    const container = document.getElementById("listaCartas");
+    container.innerHTML = "";
+    container.addEventListener("dragover", e => { e.preventDefault(); });
+    container.addEventListener("drop", e => {
+        e.preventDefault();
+        const data = e.dataTransfer.getData("text/plain");
+        if (!data) return;
+        const payload = JSON.parse(data);
+        if (payload.fromSlot !== undefined) {
+            const idx = payload.fromSlot;
+            const card = deckAtual[idx];
+            if (!card) return;
+            quantidadePorImagem[card.imagem] = (quantidadePorImagem[card.imagem] || 0) + 1;
+            deckAtual[idx] = null;
+            salvarDeck();
+            renderSlots();
+            renderCatalogo();
+        }
+    });
+    catalogo.forEach(carta => {
+        const div = document.createElement("div");
+        div.className = "carta-deck";
+        const qtd = quantidadePorImagem[carta.imagem] || 0;
+        if (qtd === 0) div.classList.add("bloqueada");
+        const infoStats = carta.tipo === "monstro"
+            ? `<div class="stats-mini"><span class="atk-text">⚔️ ${carta.ataque}</span><span class="def-text">🛡️ ${carta.defesa}</span></div>`
+            : `<div class="stats-mini"><span style="color:#666;">✨ Especial</span></div>`;
+        div.innerHTML = `<img src="${carta.imagem}"><div class="info-carta">${carta.nome}</div>${infoStats}`;
+        if (qtd > 0) div.innerHTML += `<div class="qty-badge">x${qtd}</div>`;
+        if (qtd > 0) {
+            div.setAttribute("draggable", "true");
+            div.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("text/plain", JSON.stringify(carta));
+            });
+        }
+        container.appendChild(div);
+    });
+}
+renderSlots();
+renderCatalogo();
+const btnSalvar = document.getElementById("btnSalvarDeck");
+if (btnSalvar) {
+    btnSalvar.onclick = () => {
+        const filled = deckAtual.filter(Boolean).length;
+        if (filled !== deckMax) { alert("Complete 24 cartas para salvar."); return; }
+        salvarDeck();
+        alert("Deck salvo!");
+    };
+}
+</script>
+</body>
+</html>
