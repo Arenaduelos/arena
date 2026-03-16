@@ -1,0 +1,243 @@
+/* === css/arena.css === */
+
+.arena {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: calc(100vh - 60px);
+    padding: 10px;
+}
+
+.arena-horizontal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+    flex: 1;
+}
+
+.centro {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.arena-horizontal .campo {
+    width: auto;
+    flex: 1 1 0;
+}
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0,0,0,0.3);
+    padding: 8px;
+    border-radius: 10px;
+    width: 100%;
+    align-items: center;
+}
+
+.linha {
+    display: flex;
+    gap: 50px;
+    justify-content: center;
+    min-height: 130px;
+    width: 100%;
+    align-items: center;
+    position: relative;
+    overflow: visible; /* Importante para as tags de ATK/DEF */
+}
+
+/* Centro: Baralho e Cemitérios */
+.deck-area-horizontal {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.cemiterio {
+    width: 90px;
+    height: 120px;
+    border: 2px solid #666;
+    position: relative;
+    background-color: rgba(0,0,0,0.7);
+    background-image: url('../imagens/cemiterio.jpg');
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+.cemiterio::after {
+    content: attr(data-label);
+    position: absolute;
+    top: 40%;
+    left: 30%;
+    opacity: 0.2;
+    font-size: 20px;
+    pointer-events: none;
+}
+
+.gy-count {
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+    background: rgba(0,0,0,0.85);
+    color: gold;
+    font-size: 10px;
+    padding: 1px 5px;
+    border: 1px solid gold;
+    z-index: 10;
+    border-radius: 2px;
+}
+
+.monte-compra { display: flex; flex-direction: column; align-items: center; }
+
+.btn-ataque-direto {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background: #e74c3c;
+    color: white;
+    border: 2px solid #c0392b;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+#btnComprar {
+    width: 90px;
+    height: 120px;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    border: 2px solid gold;
+    border-radius: 4px;
+    overflow: hidden;
+    background: none;
+}
+
+#btnComprar img { width: 100%; height: 100%; object-fit: cover; }
+
+#btnComprar span {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(0,0,0,0.85);
+    font-size: 9px;
+    color: gold;
+    text-align: center;
+    padding: 2px 0;
+}
+
+#contador-deck { color: gold; font-size: 11px; margin-top: 4px; }
+
+/* Responsividade Arena */
+@media (max-width: 800px) {
+    .linha { gap: 30px; min-height: 110px; }
+    .cemiterio, #btnComprar { width: 78px; height: 108px; }
+}
+
+/* Estilos para Modo Paisagem (Celular de Lado) */
+@media (max-height: 500px) and (orientation: landscape) {
+    .arena {
+        flex-direction: column;
+        justify-content: center;
+        padding: 2px;
+        gap: 2px;
+        min-height: 100vh;
+    }
+
+    .arena-horizontal {
+        flex-direction: row;
+        gap: 15px;
+        flex: 1;
+        align-items: center;
+    }
+
+    .campo {
+        padding: 2px;
+        gap: 2px;
+        background: none;
+    }
+
+    .linha {
+        min-height: 70px;
+        gap: 10px;
+    }
+
+    .slot {
+        width: 55px;
+        height: 75px;
+    }
+
+    .cemiterio, #btnComprar {
+        width: 55px;
+        height: 75px;
+    }
+
+    /* Aproxima a mão do jogador do campo no modo paisagem */
+    .mao-container:not(.topo) {
+        margin-top: -40px; /* Puxa a mão para cima do campo */
+        z-index: 100;
+    }
+    
+    .mao {
+        min-height: 80px;
+        padding: 0;
+    }
+
+    .carta-mao {
+        width: 50px;
+        height: 70px;
+    }
+
+    .mao-container.topo {
+        margin-bottom: -40px; /* Puxa a mão da máquina para baixo */
+        z-index: 100;
+    }
+    
+    .centro {
+        margin-top: 0;
+    }
+    
+    .log-panel {
+        display: none; /* Esconde o log no landscape mobile para ganhar espaço */
+    }
+
+    .status-bar {
+        padding: 2px 10px;
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 560px) {
+    .arena {
+        gap: 5px; /* Aproxima os elementos na vertical */
+        padding: 4px 2px;
+    }
+    .arena-horizontal {
+        flex-direction: column;
+        gap: 10px; /* Reduz gap entre campos */
+        align-items: center;
+    }
+    .linha { 
+        gap: 10px; 
+        min-height: 85px; /* Reduz altura mínima das linhas */
+    }
+    .cemiterio, #btnComprar { width: 60px; height: 85px; }
+    
+    /* Aproxima a mão do jogador do campo */
+    .mao-container:not(.topo) {
+        margin-top: -10px; 
+    }
+}

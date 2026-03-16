@@ -1,0 +1,177 @@
+/* === css/cartas.css === */
+
+.slot {
+    width: 90px;
+    height: 120px;
+    border: 2px dashed rgba(255,215,0,0.3);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    flex-shrink: 0;
+    border-radius: 4px;
+    transition: border-color 0.2s;
+}
+
+.slot:hover { border-color: rgba(255,215,0,0.6); }
+
+.carta-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 3px;
+    transition: transform 0.3s;
+}
+
+.modo-defesa .carta-img {
+    transform: rotate(90deg);
+    border: 2px solid #3498db;
+}
+
+/* --- Status de ATK/DEF no Campo --- */
+.status-dual {
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 34px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid gold;
+    display: flex;
+    z-index: 10;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.stat-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-box:first-child {
+    border-right: 1px solid gold;
+}
+
+.stat-label {
+    font-size: 7px;
+    color: #ccc;
+    line-height: 1;
+}
+
+.stat-value {
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+.stat-value.atk { color: #3498db; }
+.stat-value.def { color: #ffff00; }
+
+/* Tags de Status */
+.bloqueio-tag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 2px;
+    text-align: center;
+    z-index: 11;
+}
+
+.alvo-tag {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 255, 0.8);
+    color: white;
+    font-size: 8px;
+    padding: 2px;
+    text-align: center;
+    z-index: 11;
+}
+
+/* Mão do Jogador */
+.mao-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 2px 0 0;
+    min-height: 130px; /* Aumentado para coincidir com .mao */
+}
+
+.mao-container.topo {
+    padding: 6px 0 0;
+    min-height: 130px; /* Aumentado para coincidir com .mao */
+}
+
+.mao {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 130px;
+    position: relative;
+    padding: 0 30px;
+}
+
+.carta-mao {
+    width: 72px;
+    height: 105px;
+    margin: 0 -10px;
+    cursor: pointer;
+    border-radius: 5px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.7);
+    transition: transform 0.2s, z-index 0s;
+    transform-origin: bottom center;
+    position: relative;
+}
+
+.carta-mao img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.carta-mao:hover {
+    transform: translateY(-15px) scale(1.1);
+    z-index: 100;
+}
+
+.mao-stats {
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.9);
+    border: 1px solid gold;
+    font-size: 9px;
+    padding: 2px 3px;
+    text-align: center;
+}
+
+/* Responsividade Cartas */
+@media (max-width: 800px) {
+    .slot { width: 78px; height: 108px; }
+}
+
+@media (max-width: 560px) {
+    .slot { width: 60px; height: 85px; }
+    .carta-mao { width: 52px; height: 78px; margin: 0 -12px; }
+    .mao-container { min-height: 90px; }
+    .mao-container.topo { min-height: 100px; }
+    .mao { min-height: 100px; padding: 0 10px; }
+    .mao-stats { font-size: 7px; padding: 1px 2px; bottom: -4px; }
+}

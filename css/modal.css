@@ -1,0 +1,82 @@
+/* === css/modal.css === */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    padding: 12px;
+}
+
+.modal-content {
+    background: #c2a679;
+    padding: 20px 16px;
+    border: 4px solid #3d2b1f;
+    text-align: center;
+    color: #3d2b1f;
+    max-width: 340px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 4px;
+}
+
+.modal-content h3 {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+}
+
+.modal-content button {
+    display: block;
+    width: 100%;
+    margin: 6px 0;
+    padding: 10px;
+    background: #3d2b1f;
+    color: gold;
+    border: none;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.modal-content button:hover { background: #5a4030; }
+
+/* Roleta */
+.roleta-moldura {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 4px solid #3d2b1f;
+    overflow: hidden;
+    position: relative;
+    margin: 10px auto;
+}
+
+#roleta { width: 100%; height: 100%; transition: 3s; position: relative; }
+.fatia { position: absolute; width: 100%; height: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+.voce    { background: green; top: 0; }
+.maquina { background: red;   bottom: 0; }
+
+/* Resultado */
+.resultado-titulo {
+    font-size: 2rem;
+    font-weight: bold;
+    letter-spacing: 3px;
+    margin-bottom: 14px;
+}
+
+.resultado-titulo.vitoria { color: gold; text-shadow: 0 0 16px gold; }
+.resultado-titulo.derrota { color: #c0392b; text-shadow: 0 0 16px #c0392b; }
+
+.resultado-carta-box img {
+    width: 110px;
+    height: 155px;
+    object-fit: cover;
+    border: 3px solid gold;
+    border-radius: 5px;
+}
