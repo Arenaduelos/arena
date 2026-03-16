@@ -1,145 +1,254 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Arena de Duelo</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Arena de Duelo - Mini Duel</title>
 
-    <link rel="stylesheet" href="logado.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/arena.css">
+<link rel="stylesheet" href="css/cartas.css">
+<link rel="stylesheet" href="css/modal.css">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+
 </head>
 <body>
 
-    <!-- BARRA DE STATUS -->
-    <div class="status-bar">
-        <div class="status-lado">
-            <span class="status-icone">👤</span>
-            <span id="nomeUser">JOGADOR</span>:
-            <span id="vidaJogador" class="lp-valor">10000</span>
-            <span class="lp-label">LP</span>
-        </div>
+<!-- BARRA DE STATUS -->
+<div class="status-bar">
 
-        <div class="status-centro">
-            <div id="turnoAviso">SORTEANDO...</div>
+    <div class="status-lado">
+        <span class="status-icone">👤</span>
+        <span id="nomeUser">JOGADOR</span>:
+        <span id="vidaJogador" class="lp-valor">10000</span>
+        <span class="lp-label">LP</span>
+    </div>
+
+    <div class="status-centro">
+        <div id="turnoAviso">SORTEANDO...</div>
+        <div id="placarMelhorDe3" style="color:gold; font-size:12px; font-weight:bold; margin-top:2px;">RODADA 1: 0 - 0</div>
+
+        <div style="display:flex; gap:10px;">
             <button id="btnPassarTurno" onclick="passarTurno()" style="display:none;">
                 PASSAR TURNO
             </button>
-        </div>
-
-        <div class="status-lado">
-            <span class="status-icone">🖥️</span>
-            MÁQUINA:
-            <span id="vidaOponente" class="lp-valor">10000</span>
-            <span class="lp-label">LP</span>
-        </div>
-    </div>
-
-
-    <!-- WRAPPER PRINCIPAL -->
-    <div class="pagina-wrapper">
-
-        <!-- ARENA -->
-        <div class="arena">
-            <div class="mao-container topo">
-                <div id="maoOponente" class="mao"></div>
-            </div>
-            <div class="arena-horizontal">
-                <div class="campo oponente">
-                    <div class="linha suporte" id="especiaisOponente"></div>
-                    <div class="linha combate" id="monstrosOponente"></div>
-                    <button id="btnAtaqueDireto" class="btn-ataque-direto" onclick="ataqueDireto()" style="display:none;">
-                        ⚔ ATACAR DIRETO
-                    </button>
-                </div>
-                <div class="centro">
-                    <div class="deck-area-horizontal">
-                        <div class="cemiterio" id="cemiterioOponente" data-label="GY"></div>
-                        <div class="monte-compra">
-                            <button id="btnComprar" onclick="comprarCarta()">
-                                <img src="imagens/back.jpg" alt="Deck">
-                                <span>BARALHO</span>
-                            </button>
-                            <small id="contador-deck">0</small>
-                        </div>
-                        <div class="cemiterio" id="cemiterioJogador" data-label="GY"></div>
-                    </div>
-                </div>
-                <div class="campo jogador">
-                    <div class="linha combate" id="monstrosJogador"></div>
-                    <div class="linha suporte" id="especiaisJogador"></div>
-                </div>
-            </div>
-            <div class="mao-container">
-                <div id="minhaMao" class="mao"></div>
-            </div>
-        </div>
-
-
-        <!-- PAINEL DE LOG -->
-        <div class="log-panel" id="logPanel">
-            <div class="log-header" onclick="toggleLog()">
-                <span>LOG DE BATALHA</span>
-                <span id="logToggleIcon">▼</span>
-            </div>
-            <div id="logConteudo" class="log-conteudo"></div>
-        </div>
-
-    </div>
-
-
-    <!-- MODAL ROLETA -->
-    <div id="modalRoleta" class="modal" style="display: flex;">
-        <div class="modal-content">
-            <h3>QUEM COMEÇA?</h3>
-
-            <div class="roleta-moldura">
-                <div id="roleta">
-                    <div class="fatia voce">VOCÊ</div>
-                    <div class="fatia maquina">MÁQUINA</div>
-                </div>
-            </div>
-
-            <button id="btnGirar" onclick="girarRoleta()">
-                GIRAR
+            <button id="btnSairJogo" class="toolbar-btn" style="background: #8b0000; padding: 5px 15px; font-size: 12px;" onclick="window.location.href='mdeck.html'">
+                SAIR DO JOGO
             </button>
         </div>
     </div>
 
+    <div class="status-lado">
+        <span class="status-icone">🖥️</span>
+        MÁQUINA:
+        <span id="vidaOponente" class="lp-valor">10000</span>
+        <span class="lp-label">LP</span>
+    </div>
 
-    <!-- MODAL RESULTADO FINAL -->
-    <div id="modalResultado" class="modal">
-        <div class="modal-content resultado-content">
-            <div id="resultadoTitulo" class="resultado-titulo"></div>
-            <div id="resultadoCartaBox" class="resultado-carta-box" style="display:none">
-                <p class="resultado-subtitulo">CARTA DESBLOQUEADA</p>
-                <img id="resultadoCartaImg" src="" alt="">
-                <div id="resultadoCartaInfo"></div>
+</div>
+
+
+<!-- WRAPPER PRINCIPAL -->
+<div class="pagina-wrapper">
+
+
+<!-- ARENA -->
+<div class="arena">
+
+    <!-- MÃO OPONENTE -->
+    <div class="mao-container topo">
+        <div id="maoOponente" class="mao"></div>
+    </div>
+
+
+    <div class="arena-horizontal">
+
+        <!-- CAMPO OPONENTE -->
+        <div class="campo oponente">
+
+            <div class="linha suporte" id="especiaisOponente"></div>
+
+            <div class="linha combate" id="monstrosOponente"></div>
+
+            <button id="btnAtaqueDireto"
+                    class="btn-ataque-direto"
+                    onclick="ataqueDireto()"
+                    style="display:none;">
+
+                ⚔ ATACAR DIRETO
+
+            </button>
+
+        </div>
+
+
+        <!-- CENTRO -->
+        <div class="centro">
+
+            <div class="deck-area-horizontal">
+
+                <div class="cemiterio"
+                     id="cemiterioOponente"
+                     data-label="GY"></div>
+
+
+                <div class="monte-compra">
+
+                    <button id="btnComprar" onclick="comprarCarta()">
+
+                        <img src="imagens/back.jpg" alt="Deck">
+
+                        <span>BARALHO</span>
+
+                    </button>
+
+                    <small id="contador-deck">0</small>
+
+                </div>
+
+
+                <div class="cemiterio"
+                     id="cemiterioJogador"
+                     data-label="GY"></div>
+
             </div>
-            <div id="resultadoMensagem" class="resultado-msg"></div>
-            <button onclick="location.reload()">CONTINUAR</button>
+
         </div>
+
+
+        <div class="campo jogador">
+
+            <div class="linha combate" id="monstrosJogador"></div>
+
+            <div class="linha suporte" id="especiaisJogador"></div>
+
+        </div>
+
     </div>
 
-    <!-- MODAL AÇÃO -->
-    <div id="modalPosicao" class="modal">
-        <div class="modal-content">
-            <h3 id="textoModal">ESCOLHA UMA AÇÃO</h3>
-            <div id="botoesAcao"></div>
-            <button onclick="fecharModal()">CANCELAR</button>
-        </div>
+
+    <!-- MÃO DO JOGADOR -->
+    <div class="mao-container">
+        <div id="minhaMao" class="mao"></div>
     </div>
 
+</div>
 
-    <script src="script.js"></script>
-    <script>
-        function toggleLog() {
-            const conteudo = document.getElementById("logConteudo");
-            const icon = document.getElementById("logToggleIcon");
-            const aberto = conteudo.style.display !== "none";
-            conteudo.style.display = aberto ? "none" : "block";
-            icon.textContent = aberto ? "▲" : "▼";
-        }
-    </script>
+
+<!-- LOG -->
+<div class="log-panel" id="logPanel">
+
+    <div class="log-header" onclick="toggleLog()">
+        <span>LOG DE BATALHA</span>
+    </div>
+
+    <div id="logConteudo" class="log-conteudo"></div>
+
+</div>
+
+</div>
+
+
+
+<!-- MODAL ROLETA -->
+<div id="modalRoleta" class="modal" style="display:flex;">
+
+    <div class="modal-content">
+
+        <h3>QUEM COMEÇA?</h3>
+
+        <div class="roleta-moldura">
+
+            <div id="roleta">
+
+                <div class="fatia voce">
+                    VOCÊ
+                </div>
+
+                <div class="fatia maquina">
+                    MÁQUINA
+                </div>
+
+            </div>
+
+        </div>
+
+        <button id="btnGirar" onclick="girarRoleta()">
+            GIRAR
+        </button>
+
+    </div>
+
+</div>
+
+
+
+<!-- MODAL RESULTADO -->
+<div id="modalResultado" class="modal">
+
+<div class="modal-content resultado-content">
+
+    <div id="resultadoTitulo" class="resultado-titulo"></div>
+
+    <div id="resultadoCartaBox"
+         class="resultado-carta-box"
+         style="display:none">
+
+        <p class="resultado-subtitulo">
+            CARTA DESBLOQUEADA
+        </p>
+
+        <img id="resultadoCartaImg" src="" alt="">
+
+        <div id="resultadoCartaInfo"></div>
+
+    </div>
+
+    <div id="resultadoMensagem" class="resultado-msg"></div>
+
+    <button onclick="location.reload()">
+        CONTINUAR
+    </button>
+
+</div>
+
+</div>
+
+
+
+<!-- MODAL AÇÃO -->
+<div id="modalPosicao" class="modal">
+
+<div class="modal-content">
+
+    <h3 id="textoModal">
+        ESCOLHA UMA AÇÃO
+    </h3>
+
+    <div id="botoesAcao"></div>
+
+    <button onclick="fecharModal()">
+        CANCELAR
+    </button>
+
+</div>
+
+</div>
+
+<!-- AVISO DE ROTAÇÃO -->
+<div id="avisoRotacao" class="aviso-rotacao">
+    <div class="aviso-rotacao-box">
+        <div class="aviso-rotacao-icon">🔄</div>
+        <h3>Melhor Experiência</h3>
+        <p>Gire seu celular para jogar na horizontal!</p>
+        <button onclick="document.getElementById('avisoRotacao').style.display='none'">ENTENDI</button>
+    </div>
+</div>
+
+
+
+<!-- MODULOS DE JOGO -->
+<script src="script.js"></script>
 
 </body>
 </html>

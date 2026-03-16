@@ -1,861 +1,2009 @@
+/* === VARIÁVEIS DE ESTADO === */
 let vidaJogador = 5000, vidaOponente = 5000;  
 let turnoAtual = "";
-let primeiroTurnoDoJogo = true;
-let cartaPendente = null;
-let atacanteSelecionadoIdx = null;
 let jaInvocouMonstro = false;
-let jaComprou = false;
-let jaMudouPosicao = false;
-let callbackSelecao = null;
+let jaComprouCarta = false;     
+let totalTurnosPartida = 0; // Contador de turnos global  
 
-// === LOG DE BATALHA ===
-const batalhaLog = [];
-function addLog(msg, tipo = "info") {
-    batalhaLog.unshift({ msg, tipo });
-    if (batalhaLog.length > 40) batalhaLog.pop();
-    const el = document.getElementById("logConteudo");
-    if (!el) return;
-    el.innerHTML = batalhaLog
-        .map(e => `<div class="log-item ${e.tipo}">${e.msg}</div>`)
-        .join("");
-}
+// Variáveis para Melhor de 3
+let vitoriasRodadaJogador = 0;
+let vitoriasRodadaOponente = 0;
+let rodadaAtual = 1;
+let fimDeRodadaProcessando = false;
 
 const usuario = localStorage.getItem("usuarioLogado") || "Duelista";
-let meuDeck = JSON.parse(localStorage.getItem(`deck_build_${usuario}`))
-    || JSON.parse(localStorage.getItem(`deck_${usuario}`))
-    || JSON.parse(localStorage.getItem(`deck_inventory_${usuario}`))
-    || [];
-let minhaMao = [];
-let deckOponente = [];
-let maoOponente = [];
+let nivelAtual = parseInt(localStorage.getItem(`nivel_${usuario}`)) || 1;
 
-let monstrosJogador = [null, null, null];
-let especiaisJogador = [null, null, null];
-let monstrosOponente = [null, null, null];
-let especiaisOponente = [null, null, null];
+const monstrosPorNivel = {
+    1:  { nome: "Planta",    pasta: "plantas",    imgPrefix: "planta",    atk: 500,  def: 400 },
+    2:  { nome: "Inseto",    pasta: "insetos",    imgPrefix: "inseto",    atk: 600,  def: 650 },
+    3:  { nome: "Guerreiro", pasta: "guerreiros", imgPrefix: "guerreiro", atk: 1050, def: 860 },
+    4:  { nome: "Orc",       pasta: "orcs",       imgPrefix: "orc",       atk: 1200, def: 950 },
+    5:  { nome: "Troll",     pasta: "trolls",     imgPrefix: "troll",     atk: 1700, def: 1010 },
+    6:  { nome: "Ogro",      pasta: "ogros",      imgPrefix: "ogro",      atk: 2200, def: 1500 },
+    7:  { nome: "Fada",      pasta: "fadas",      imgPrefix: "fada",      atk: 2700, def: 1750 },
+    8:  { nome: "Dragão",    pasta: "dragoes",    imgPrefix: "dragao",    atk: 3200, def: 2000 },
+    9:  { nome: "Mago",      pasta: "magos",      imgPrefix: "mago",      atk: 3800, def: 2700 },
+    10: { nome: "Ceifeiro",  pasta: "mortes",     imgPrefix: "morte",     atk: 4300, def: 3100 }
+};
 
-let cemiterioJogador = [];
-let cemiterioOponente = [];
+// --- FUNÇÃO AUXILIAR PARA SONS ---
+function tocarSom(caminho) {
+    // Corrige caminhos que possam estar vindo com diretório duplicado ou errado
+    let caminhoLimpo = caminho.replace("efeitosonoros/efeitosonoros/", "efeitosonoros/");
+    caminhoLimpo = caminhoLimpo.replace("sons/", "efeitosonoros/");
+    
+    // Mapeamento de sons que mudaram de nome ou precisam de correção
+    const mapaSons = {
+        "efeitosonoros/trocal.ogg": "efeitosonoros/trocal.ogg", // já está correto se existir
+        "efeitosonoros/trcal.ogg": "efeitosonoros/trocal.ogg",
+        "efeitosonoros/inserircarta.ogg": "efeitosonoros/carta.ogg",
+        "efeitosonoros/porcarta.ogg": "efeitosonoros/carta.ogg"
+    };
 
-document.getElementById("nomeUser").innerText = usuario.toUpperCase();
-meuDeck.sort(() => Math.random() - 0.5);
+    if (mapaSons[caminhoLimpo]) {
+        caminhoLimpo = mapaSons[caminhoLimpo];
+    }
 
-// === INÍCIO DO JOGO ===
-function girarRoleta() {
-    const btnGirar = document.getElementById("btnGirar");
-    const r = document.getElementById("roleta");
-    btnGirar.disabled = true;
+    const audio = new Audio(caminhoLimpo);
+    audio.play().catch(e => console.log("Erro ao tocar som:", e, "Caminho:", caminhoLimpo));
+}
 
-    const sortei = Math.random() > 0.5 ? "VOCÊ" : "MÁQUINA";
-    deckOponente = [...meuDeck].sort(() => Math.random() - 0.5);
+// --- FUNÇÃO PARA ANIMAR CONTAGEM DE HP ---
+function animarContagemHP(id, inicio, fim, duracao) {
+    const obj = document.getElementById(id);
+    if (!obj) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duracao, 1);
+        const valorAtual = Math.floor(progress * (fim - inicio) + inicio);
+        obj.innerText = valorAtual;
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            obj.innerText = fim;
+        }
+    };
+    window.requestAnimationFrame(step);
+}
 
-    r.style.transform = sortei === "VOCÊ" ? "rotate(1800deg)" : "rotate(1980deg)";
+// --- FUNÇÕES PARA ATUALIZAR VIDA COM SOM ---
+function alterarVida(alvo, novoValor) {
+    const antigoValor = alvo === "jogador" ? vidaJogador : vidaOponente;
+    if (antigoValor !== novoValor) {
+        if (alvo === "jogador") vidaJogador = Math.max(0, novoValor);
+        else vidaOponente = Math.max(0, novoValor);
+        
+        tocarSom("efeitosonoros/prpontos.ogg");
+        atualizarTela();
+        verificarFimJogo();
+    }
+}
+
+// --- SOM DE HOVER GLOBAL ---
+function configurarHoverSons() {
+    document.body.addEventListener("mouseover", (e) => {
+        const target = e.target.closest(".slot, .carta-img, .carta-deck, .slot-deck-vazio, .slot-deck-vazio.preenchido, .item-loja, .carta-bau");
+        if (target) {
+            tocarSom("efeitosonoros/carta.ogg");
+        }
+    });
+}
+configurarHoverSons();
+atualizarPlacarMelhorDe3();
+
+// --- FUNÇÃO PARA ANIMAÇÃO DE ATAQUE ---
+function animarAtaque(idxAtacante, idxAlvo, atacanteEhJogador, callback) {
+    const atacanteId = atacanteEhJogador ? "monstrosJogador" : "monstrosOponente";
+    const alvoId = atacanteEhJogador ? "monstrosOponente" : "monstrosJogador";
+    
+    const containerAtacante = document.getElementById(atacanteId);
+    const containerAlvo = document.getElementById(alvoId);
+    
+    // Se for ataque direto (alvo null ou undefined)
+    if (idxAlvo === null || idxAlvo === undefined) {
+        const slotAtacante = containerAtacante.children[idxAtacante];
+        if (!slotAtacante) return callback();
+        
+        slotAtacante.style.transition = "transform 0.3s ease-in-out";
+        slotAtacante.style.zIndex = "10000";
+        // Avança um pouco para frente
+        const direcao = atacanteEhJogador ? -50 : 50;
+        slotAtacante.style.transform = `translateY(${direcao}px) scale(1.1)`;
+        
+        setTimeout(() => {
+            slotAtacante.style.transform = "translateY(0)";
+            setTimeout(() => {
+                slotAtacante.style.transition = "";
+                slotAtacante.style.zIndex = "";
+                callback();
+            }, 300);
+        }, 300);
+        return;
+    }
+
+    if (!containerAtacante || !containerAlvo) return callback();
+
+    const slotAtacante = containerAtacante.children[idxAtacante];
+    const slotAlvo = containerAlvo.children[idxAlvo];
+
+    if (!slotAtacante || !slotAlvo) return callback();
+
+    const rectAtacante = slotAtacante.getBoundingClientRect();
+    const rectAlvo = slotAlvo.getBoundingClientRect();
+
+    const distX = rectAlvo.left - rectAtacante.left;
+    const distY = rectAlvo.top - rectAtacante.top;
+
+    slotAtacante.style.transition = "transform 0.4s ease-in-out";
+    slotAtacante.style.zIndex = "10000";
+    slotAtacante.style.transform = `translate(${distX}px, ${distY}px) scale(1.2)`;
 
     setTimeout(() => {
-        turnoAtual = sortei;
-        document.getElementById("modalRoleta").style.display = "none";
-        document.getElementById("btnPassarTurno").style.display = "block";
-
-        for (let i = 0; i < 3; i++) {
-            if (meuDeck.length > 0) minhaMao.push(meuDeck.pop());
-            if (deckOponente.length > 0) maoOponente.push(deckOponente.pop());
-        }
-
-        addLog(`Quem começa: <b>${turnoAtual}</b>`, "info");
-        addLog("Cada jogador recebeu 3 cartas.", "info");
-        atualizarTela();
-        if (turnoAtual === "MÁQUINA") setTimeout(turnoDaMaquina, 1500);
-    }, 3200);
+        // Impacto no alvo
+        slotAlvo.style.transition = "transform 0.1s";
+        slotAlvo.style.transform = "scale(0.8)";
+        
+        setTimeout(() => {
+            slotAlvo.style.transform = "scale(1)";
+            // Retorno do atacante
+            slotAtacante.style.transform = "translate(0, 0)";
+            setTimeout(() => {
+                slotAtacante.style.transition = "";
+                slotAtacante.style.zIndex = "";
+                callback();
+            }, 300);
+        }, 100);
+    }, 400);
 }
 
-// === MECÂNICAS DE TURNO ===
-function comprarCarta() {
-    if (turnoAtual !== "VOCÊ" || jaComprou || meuDeck.length === 0) return;
-    minhaMao.push(meuDeck.pop());
-    jaComprou = true;
-    addLog("Você comprou uma carta.", "info");
-    atualizarTela();
-}
+let monstrosJogador = [null, null, null], especiaisJogador = [null, null, null];
+let monstrosOponente = [null, null, null], especiaisOponente = [null, null, null];
+let cemiterioJogador = [], cemiterioOponente = [];
 
-function passarTurno() {
-    if (turnoAtual !== "VOCÊ") return;
-    addLog("Você passou o turno. Vez da MÁQUINA.", "info");
-    turnoAtual = "MÁQUINA";
-    primeiroTurnoDoJogo = false;
-    resetarTurno();
-    atualizarTela();
-    setTimeout(turnoDaMaquina, 1500);
-}
+// --- AJUSTE: Carrega o Deck de 24 cartas do mdeck.html ---
+let meuDeck = JSON.parse(localStorage.getItem(`deck_build_${usuario}`)) || [];
+let deckOponente = []; 
+let minhaMao = [], maoOponente = [];
 
-function resetarTurno() {
-    jaInvocouMonstro = false;
-    jaComprou = false;
-    jaMudouPosicao = false;
-    atacanteSelecionadoIdx = null;
-    monstrosJogador.forEach(m => { if (m) m.jaAtacou = false; });
-    monstrosOponente.forEach(m => { if (m && m.bloqueadoPor > 0) m.bloqueadoPor--; });
-    monstrosJogador.forEach(m => { if (m && m.bloqueadoPor > 0) m.bloqueadoPor--; });
-}
+/* === SISTEMA DE PRÊMIO E ROLETA DE SACRIFÍCIO === */
+function concederPremios() {
+    let moedasAtuais = parseInt(localStorage.getItem(`moedas_${usuario}`)) || 0;
+    let vitoriasAtuais = parseInt(localStorage.getItem(`vitorias_${usuario}`)) || 0;
+    
+    // Cada rodada vencida no Melhor de 3 dá uma estrela
+    // Se o jogador ganhou o melhor de 3, ele obrigatoriamente ganhou 2 rodadas.
+    // Mas a lógica pede 1 estrela por rodada de batalha GANHA.
+    // vitoriasRodadaJogador já contém quantas rodadas ele ganhou nesta partida (serão 2 se ele chegou aqui)
+    
+    let estrelasAtuais = parseInt(localStorage.getItem(`vits_no_nivel_${usuario}`)) || 0;
+    estrelasAtuais += vitoriasRodadaJogador; // Ganha estrelas pelas rodadas vencidas
 
-// === AÇÕES DO JOGADOR ===
-function usarDaMao(idx) {
-    if (turnoAtual !== "VOCÊ") return;
-    const carta = minhaMao[idx];
-    cartaPendente = { carta, idxNaMao: idx };
+    // Lógica de Moedas baseada no Nível
+    let premioMoedas = 5000; // Padrão para nível 8+
+    if (nivelAtual === 1) premioMoedas = 300000;
+    else if (nivelAtual === 2) premioMoedas = 200000;
+    else if (nivelAtual === 3) premioMoedas = 100000;
+    else if (nivelAtual >= 4 && nivelAtual <= 7) premioMoedas = 50000;
 
-    const botoes = document.getElementById("botoesAcao");
-    botoes.innerHTML = "";
+    moedasAtuais += premioMoedas;
+    vitoriasAtuais += 1; // Vitória de partida (Melhor de 3)
 
-    if (carta.tipo === "monstro") {
-        if (jaInvocouMonstro) return alert("Apenas 1 invocação por turno!");
-        if (monstrosJogador.findIndex(s => s === null) === -1) return alert("Campo cheio!");
-        botoes.innerHTML = `
-            <button onclick="definirPosicao('ataque')">ATAQUE</button>
-            <button onclick="definirPosicao('defesa')">DEFESA</button>`;
-    } else {
-        const slotDisp = especiaisJogador.findIndex(s => s === null);
-        botoes.innerHTML = "";
-        if (slotDisp !== -1) {
-            botoes.innerHTML += `<button onclick="definirPosicao('baixar')">BAIXAR VIRADA</button>`;
-        }
-        botoes.innerHTML += `<button onclick="definirPosicao('ativar')">ATIVAR</button>`;
+    let subiuNivel = false;
+    // SISTEMA DE SUBIDA DE NÍVEL (5 estrelas)
+    if (estrelasAtuais >= 5) {
+        nivelAtual += 1;
+        estrelasAtuais = 0; // Recomeça a contar
+        subiuNivel = true;
+        localStorage.setItem(`nivel_${usuario}`, nivelAtual);
     }
 
-    document.getElementById("textoModal").innerText = carta.nome ? carta.nome.toUpperCase() : "ESCOLHA UMA AÇÃO";
-    document.getElementById("modalPosicao").style.display = "flex";
+    localStorage.setItem(`moedas_${usuario}`, moedasAtuais);
+    localStorage.setItem(`vitorias_${usuario}`, vitoriasAtuais);
+    localStorage.setItem(`vits_no_nivel_${usuario}`, estrelasAtuais);
+
+    let msg = `Você ganhou <strong>${premioMoedas.toLocaleString('pt-BR')}</strong> moedas.`;
+    if (subiuNivel) {
+        msg += `<br><br><span style="color:gold; font-size:20px;">PARABÉNS!</span><br>Você subiu para o <strong>Nível ${nivelAtual}</strong>!`;
+    } else {
+        msg += `<br>Estrelas: ${estrelasAtuais}/5 para o próximo nível.`;
+    }
+
+    // Custom box para vitória
+    const overlay = document.createElement("div");
+    overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;";
+    const box = document.createElement("div");
+    box.style = "background:#c2a679; border:4px solid #3d2b1f; padding:30px; border-radius:10px; text-align:center; max-width:400px; width:90%;";
+    box.innerHTML = `
+        <h2 style="margin-top:0; color:#3d2b1f;">VITÓRIA NO MELHOR DE 3!</h2>
+        <p style="font-size:18px; color:#1a0f08;">${msg}</p>
+        <button id="btnOkVitoria" style="padding:12px 25px; background:#3d2b1f; color:gold; border:none; border-radius:5px; font-family:'Cinzel', serif; font-weight:bold; cursor:pointer; margin-top:15px;">COLETAR PRÊMIOS</button>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById("btnOkVitoria").onclick = () => {
+        document.body.removeChild(overlay);
+        
+        const falasVitoria = [
+            "Impressionante... você realmente possui uma força incomum.",
+            "Talvez eu tenha subestimado você. Reconheço sua vitória.",
+            "Você provou seu valor na arena. Pegue suas recompensas."
+        ];
+        const fala = falasVitoria[Math.floor(Math.random() * falasVitoria.length)];
+        
+        mostrarNarrador(fala, () => {
+            abrirRoletaSacrificio();
+        });
+    };
 }
 
-function definirPosicao(acao) {
-    const { carta, idxNaMao } = cartaPendente;
+function abrirRoletaSacrificio() {
+    const overlay = document.createElement("div");
+    overlay.id = "overlayRoletaSacrificio";
+    // overflow: hidden para evitar scroll horizontal durante a rotação
+    overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;z-index:20000;color:gold;font-family:'Cinzel',serif;overflow:hidden;";
+    
+    const container = document.createElement("div");
+    // Removido overflow-y:auto para evitar conflitos de scroll e centralizar melhor
+    container.style = "background:#111;border:3px solid gold;padding:20px;border-radius:20px;text-align:center;max-width:95vw;position:relative;";
+    
+    container.innerHTML = `
+        <h2 style="margin-top:0; font-size:1.5rem;">VITÓRIA!</h2>
+        <p style="margin-bottom:15px; font-size:0.9rem;">Gire a roleta para um prêmio especial!</p>
+        <div style="position:relative; width:320px; height:320px; margin:0 auto; display:flex; align-items:center; justify-content:center;">
+            <!-- will-change e backface-visibility para evitar o tremor/shaking -->
+            <canvas id="canvasSacrificio" width="320" height="320" style="border-radius:50%; transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); will-change: transform; backface-visibility: hidden;"></canvas>
+            <div style="position:absolute; top:-15px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:15px solid transparent; border-right:15px solid transparent; border-top:30px solid #ff4500; z-index:100; filter: drop-shadow(0 0 5px #000);"></div>
+        </div>
+        <button id="btnGirarSacrificio" style="padding:12px 25px;font-size:1.1rem;background:gold;border:none;cursor:pointer;font-weight:bold;color:black;border-radius:5px; margin-top:20px; box-shadow: 0 0 10px gold;">GIRAR ROLETA</button>
+    `;
+    
+    overlay.appendChild(container);
+    document.body.appendChild(overlay);
 
-    if (carta.tipo === "monstro") {
-        let slot = monstrosJogador.findIndex(s => s === null);
-        if (slot !== -1) {
-            monstrosJogador[slot] = {
-                ...carta,
-                modo: acao,
-                revelada: acao === "ataque",
-                jaAtacou: false,
-                bloqueadoPor: 0
-            };
-            jaInvocouMonstro = true;
-            minhaMao.splice(idxNaMao, 1);
-            addLog(`Você invocou um monstro em modo ${acao === "ataque" ? "ATAQUE" : "<i>oculto</i>"}.`, "info");
+    const canvas = document.getElementById("canvasSacrificio");
+    const ctx = canvas.getContext("2d");
+    const radius = canvas.width / 2;
+    const itens = [
+        { nome: "NADA", prob: 10, cor: "#2C2C2C" },
+        { nome: "NÍVEL 1", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 2", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 3", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 4", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 5", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 6", prob: 10, cor: "#4A4A4A" },
+        { nome: "NÍVEL 7", prob: 5, cor: "#B8860B" },
+        { nome: "NÍVEL 8", prob: 5, cor: "#B8860B" },
+        { nome: "NÍVEL 9", prob: 5, cor: "#B8860B" },
+        { nome: "NÍVEL 10", prob: 5, cor: "#B8860B" },
+        { nome: "SACRIFÍCIO 1-3", prob: 5, cor: "#DAA520" },
+        { nome: "SACRIFÍCIO 4-5", prob: 5, cor: "#DAA520" }
+    ];
+
+    const imageCache = {};
+    let imagesToLoad = itens.filter(i => i.img).length;
+    let imagesLoaded = 0;
+
+    function drawRoulette() {
+        const totalProb = itens.reduce((a, b) => a + b.prob, 0);
+        let currentAngle = -Math.PI / 2; // Começa no topo (ponteiro)
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        itens.forEach(item => {
+            const sliceAngle = (item.prob / totalProb) * 2 * Math.PI;
+            const endAngle = currentAngle + sliceAngle;
+            const midAngle = currentAngle + sliceAngle / 2;
+
+            // 1. Desenhar a fatia (slice)
+            ctx.beginPath();
+            ctx.fillStyle = item.cor;
+            ctx.moveTo(radius, radius);
+            ctx.arc(radius, radius, radius, currentAngle, endAngle);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Borda da fatia
+            ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 3. Conteúdo (Apenas Texto com Estilo Melhorado)
+            ctx.save();
+            ctx.translate(radius, radius);
+            ctx.rotate(midAngle);
+            
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#FFF";
+            // Fonte mais bonita e maior para o texto
+            ctx.font = "bold 14px 'Cinzel', serif";
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            
+            // Exibe Nome e Nível
+            let textoExibicao = item.nome;
+            
+            ctx.fillText(textoExibicao, radius - 25, 5);
+
+            ctx.restore();
+            currentAngle = endAngle;
+        });
+        
+        // Círculo central decorativo maior e mais bonito
+        ctx.beginPath();
+        ctx.arc(radius, radius, 20, 0, 2 * Math.PI);
+        const grad = ctx.createRadialGradient(radius, radius, 5, radius, radius, 20);
+        grad.addColorStop(0, "gold");
+        grad.addColorStop(1, "#8b4513");
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = "gold";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    function allImagesLoaded() {
+        imagesLoaded++;
+        if (imagesLoaded === imagesToLoad) drawRoulette();
+    }
+
+    itens.forEach(item => {
+        if (item.img) {
+            imageCache[item.img] = new Image();
+            imageCache[item.img].onload = allImagesLoaded;
+            imageCache[item.img].onerror = allImagesLoaded;
+            imageCache[item.img].src = item.img;
         }
-        fecharModal();
-        atualizarTela();
-    } else {
-        if (acao === "baixar") {
-            let slot = especiaisJogador.findIndex(s => s === null);
-            if (slot !== -1) {
-                especiaisJogador[slot] = { ...carta, revelada: false };
-                minhaMao.splice(idxNaMao, 1);
-                addLog(`Você fez um <i>movimento oculto</i>.`, "info");
+    });
+
+    if (imagesToLoad === 0) drawRoulette();
+
+    document.getElementById("btnGirarSacrificio").onclick = function() {
+        this.disabled = true;
+        this.style.opacity = "0.5";
+        
+        // Som de roleta girando
+        tocarSom("efeitosonoros/roleta.ogg");
+
+        const totalPeso = itens.reduce((acc, curr) => acc + curr.prob, 0);
+        let sorteio = Math.random() * totalPeso;
+        let itemGanhado = null;
+        let anguloAcumulado = 0;
+
+        for (let i = 0; i < itens.length; i++) {
+            const sliceDeg = (itens[i].prob / totalPeso) * 360;
+            if (sorteio < itens[i].prob) {
+                itemGanhado = itens[i];
+                // Ângulo para parar no ponteiro (topo)
+                // O meio da fatia sorteada deve ficar em -90 graus (topo)
+                const anguloMeioFatia = anguloAcumulado + sliceDeg / 2;
+                const anguloParaPonteiro = 360 - anguloMeioFatia;
+                const voltasExtras = 360 * 6; // 6 voltas completas
+                
+                canvas.style.transform = `rotate(${voltasExtras + anguloParaPonteiro}deg)`;
+                break;
             }
-            fecharModal();
-            atualizarTela();
+            sorteio -= itens[i].prob;
+            anguloAcumulado += sliceDeg;
+        }
+
+        setTimeout(() => {
+            if (itemGanhado.nome === "GIRAR NOVAMENTE") {
+                this.disabled = false;
+                this.style.opacity = "1";
+                alert("Você ganhou outra chance! Gire novamente!");
+                // Reset sem animação para girar de novo
+                canvas.style.transition = 'none';
+                canvas.style.transform = `rotate(0deg)`;
+                setTimeout(() => { 
+                    canvas.style.transition = 'transform 5s cubic-bezier(0.15, 0, 0.15, 1)';
+                    drawRoulette(); 
+                }, 50);
+                return;
+            }
+            overlay.remove();
+            sortearCartaRecompensa(itemGanhado);
+        }, 5600);
+    };
+}
+
+function sortearCartaRecompensa(itemGanhado) {
+    let cartaFinal = null;
+
+    if (itemGanhado.nome === "NADA") {
+        cartaFinal = null;
+    } else if (itemGanhado.nome.startsWith("NÍVEL")) {
+        const nivel = parseInt(itemGanhado.nome.split(" ")[1]);
+        const mInfo = monstrosPorNivel[nivel];
+        const imgNum = Math.floor(Math.random() * 5) + 1;
+        cartaFinal = {
+            nome: `${mInfo.nome} ${imgNum}`,
+            img: `imagens/${mInfo.pasta}/${mInfo.imgPrefix}${imgNum}.jpg`,
+            atk: mInfo.atk,
+            def: mInfo.def
+        };
+    } else if (itemGanhado.nome === "SACRIFÍCIO 1-3") {
+        const num = Math.floor(Math.random() * 3) + 1;
+        const stats = {
+            1: { atk: 5000, def: 4500 },
+            2: { atk: 5100, def: 4600 },
+            3: { atk: 5200, def: 4700 }
+        };
+        cartaFinal = {
+            nome: `Sacrifício ${num}`,
+            img: `imagens/sacrificios/sacrificio${num}.jpg`,
+            atk: stats[num].atk,
+            def: stats[num].def
+        };
+    } else if (itemGanhado.nome === "SACRIFÍCIO 4-5") {
+        const num = Math.floor(Math.random() * 2) + 4;
+        const stats = {
+            4: { atk: 5300, def: 4800 },
+            5: { atk: 5400, def: 4900 }
+        };
+        cartaFinal = {
+            nome: `Sacrifício ${num}`,
+            img: `imagens/sacrificios/sacrificio${num}.jpg`,
+            atk: stats[num].atk,
+            def: stats[num].def
+        };
+    }
+
+    exibirBoxResultado(cartaFinal);
+}
+
+function exibirBoxResultado(carta) {
+    const overlay = document.createElement("div");
+    overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.98);display:flex;align-items:center;justify-content:center;z-index:30000;color:white;font-family:'Cinzel',serif; padding:15px;";
+    
+    let contentHTML = "";
+    if (!carta) {
+        contentHTML = `
+            <div class="reward-column">
+                <div class="reward-title">RESULTADO</div>
+                <div class="card-placeholder">NENHUM PRÊMIO</div>
+            </div>
+        `;
+    } else {
+        contentHTML = `
+            <div class="reward-column">
+                <div class="reward-title">PRÊMIO GANHO</div>
+                <div class="card-container">
+                    <div class="card-inner">
+                        <div class="card-front">
+                            <img src="${carta.img}" alt="${carta.nome}">
+                        </div>
+                        <div class="card-back">
+                            <img src="imagens/back.jpg" alt="Verso da Carta">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-name">${carta.nome}</div>
+                <div style="color: gold; margin-top: 5px;">ATK: ${carta.atk} / DEF: ${carta.def}</div>
+            </div>
+        `;
+    }
+
+    const box = document.createElement("div");
+    box.style = "background:linear-gradient(45deg, #1a1a1a, #2c2c2c); border:2px solid gold; border-radius:15px; text-align:center; width:100%; max-width:500px; padding:20px; box-shadow: 0 0 30px rgba(255,215,0,0.5);";
+    box.innerHTML = `
+        <style>
+            .reward-column { display: flex; flex-direction: column; align-items: center; }
+            .reward-title { font-size: 1.2rem; color: gold; margin-bottom: 15px; text-transform: uppercase; }
+            .card-container { perspective: 1000px; width: 160px; height: 230px; }
+            .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.8s; transform-style: preserve-3d; animation: flipIn 1.5s ease-out; }
+            .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; overflow: hidden; border: 2px solid #DAA520; }
+            .card-front { background: #000; }
+            .card-back { transform: rotateY(180deg); }
+            .card-container img { width: 100%; height: 100%; object-fit: cover; }
+            .card-name { margin-top: 15px; font-size: 1rem; font-weight: bold; color: #fff; }
+            .card-placeholder { width: 160px; height: 230px; border: 2px dashed #555; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #777; font-size: 0.9rem; }
+            @keyframes flipIn { from { transform: rotateY(180deg); } to { transform: rotateY(0); } }
+            .main-title { font-size: 2rem; color: gold; margin-bottom: 20px; text-shadow: 0 0 10px gold; }
+            .action-button { padding: 12px 25px; background: gold; border: none; cursor: pointer; font-weight: bold; margin-top: 20px; border-radius: 8px; font-size: 1rem; color: #111; transition: all 0.3s; }
+            .action-button:hover { background: #fff; color: #000; box-shadow: 0 0 15px #fff; }
+        </style>
+        <div class="main-title">RECOMPENSAS DA VITÓRIA</div>
+        <div style="display: flex; justify-content: center; margin: 20px 0;">
+            ${contentHTML}
+        </div>
+        <button class="action-button" onclick="window.location.href='mdeck.html'">VER MEU DECK</button>
+    `;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    if (carta) {
+        adicionarAoBau({
+            nome: carta.nome,
+            imagem: carta.img,
+            ataque: carta.atk,
+            defesa: carta.def
+        });
+    }
+}
+
+function adicionarAoBau(c) {
+    let inv = JSON.parse(localStorage.getItem(`deck_inventory_${usuario}`)) || [];
+    inv.push({
+        nome: c.nome || c.n,
+        imagem: c.img || c.imagem,
+        tipo: "monstro",
+        ataque: c.atk || c.ataque || 0,
+        defesa: c.def || c.defesa || 0,
+        sacrifio: c.sacrifio || (c.nome && c.nome.includes("Sacrifício") ? 2 : 0)
+    });
+    localStorage.setItem(`deck_inventory_${usuario}`, JSON.stringify(inv));
+}
+
+/* === LÓGICA DE COMPRA E ROLETA === */
+function comprarCarta(alvo = "jogador") {
+    if (alvo === "jogador") {
+        if (turnoAtual !== "VOCÊ") return;
+        if (jaComprouCarta) return alert("Você já comprou uma carta neste turno!");
+        
+        let novaCarta = null;
+
+        // --- LÓGICA DE COMPRA DE CARTAS ESPECIAIS POR NÍVEL (70% de chance) ---
+        const rEspecial = Math.random() * 100;
+        if (rEspecial <= 70) {
+            if (nivelAtual >= 1 && nivelAtual <= 3) {
+                const pool = [
+                    { nome: "PowerUp", imagem: "imagens/especiais/powerup.jpg", tipo: "especial" },
+                    { nome: "PowerDown", imagem: "imagens/especiais/powerdown.jpg", tipo: "especial" },
+                    { nome: "Vida", imagem: "imagens/especiais/vida.jpg", tipo: "especial" }
+                ];
+                novaCarta = pool[Math.floor(Math.random() * pool.length)];
+            } else if (nivelAtual >= 4 && nivelAtual <= 7) {
+                const pool = [
+                    { nome: "Bloqueio", imagem: "imagens/especiais/bloqueio.jpg", tipo: "especial" },
+                    { nome: "Chamado", imagem: "imagens/especiais/chamado.jpg", tipo: "especial" },
+                    { nome: "Despertar", imagem: "imagens/especiais/despertar.jpg", tipo: "especial" }
+                ];
+                novaCarta = pool[Math.floor(Math.random() * pool.length)];
+            } else if (nivelAtual >= 8 && nivelAtual <= 10) { // Corrigido range para 8-10
+                const pool = [
+                    { nome: "Fusão", imagem: "imagens/especiais/fusao.jpg", tipo: "especial" },
+                    { nome: "Trocal", imagem: "imagens/especiais/trocal.jpg", tipo: "especial" }
+                ];
+                novaCarta = pool[Math.floor(Math.random() * pool.length)];
+            }
+        }
+
+        // Se não sorteou especial ou não está no range, compra do deck normal
+        if (!novaCarta && meuDeck.length > 0) {
+            novaCarta = meuDeck.pop();
+        }
+
+        if (novaCarta) {
+            jaComprouCarta = true;
+            tocarSom("efeitosonoros/click.ogg");
+            tocarSom("efeitosonoros/comprar.ogg");
+            
+            // Efeito visual de compra
+            const btnDeck = document.getElementById("btnComprar");
+            if (btnDeck) {
+                btnDeck.style.transform = "scale(1.1) translateY(-10px)";
+                setTimeout(() => btnDeck.style.transform = "", 300);
+            }
+
+            if (minhaMao.length >= 5) escolherDescarte(novaCarta);
+            else { minhaMao.push(novaCarta); logBatalha(`Você comprou: ${novaCarta.nome}`, "info"); }
         } else {
-            fecharModal();
-            addLog(`Você ativou <b>${carta.nome}</b>.`, "info");
-            ativarEfeito(carta, "VOCÊ", () => {
-                minhaMao.splice(idxNaMao, 1);
-                atualizarTela();
+            logBatalha("Seu deck acabou!", "morte");
+        }
+    } else {
+        if (deckOponente.length > 0) {
+            let nc = deckOponente.pop();
+            if (maoOponente.length >= 5) cemiterioOponente.push(maoOponente.shift()); 
+            maoOponente.push(nc);
+        }
+    }
+    atualizarTela();
+}
+
+function escolherDescarte(novaCarta) {
+    const ops = minhaMao.map(c => c.nome);
+    ops.push("DESCARTAR NOVA: " + novaCarta.nome);
+    mostrarSelecao("MÃO CHEIA", ops, (sel) => {
+        if (sel < minhaMao.length) {
+            cemiterioJogador.push(minhaMao[sel]);
+            minhaMao[sel] = novaCarta;
+        } else {
+            cemiterioJogador.push(novaCarta);
+        }
+        atualizarTela();
+    });
+}
+
+function girarRoleta() {
+    const btn = document.getElementById("btnGirar");
+    const r = document.getElementById("roleta");
+    const modal = document.getElementById("modalRoleta");
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "SORTEANDO...";
+    }
+
+    try {
+        // --- 1. RESET E GIRO VISUAL ---
+        if (r) {
+            r.style.transition = "none";
+            r.style.transform = "rotate(0deg)";
+            void r.offsetWidth; // Força reset visual
+            
+            setTimeout(() => {
+                const sortei = Math.random() > 0.5 ? "VOCÊ" : "MÁQUINA";
+                const graus = sortei === "VOCÊ" ? 1800 : 1980;
+                
+                r.style.transition = "transform 3s cubic-bezier(0.1, 0, 0.2, 1)";
+                r.style.transform = `rotate(${graus}deg)`;
+                
+                // Toca sons sem bloquear
+                tocarSom("efeitosonoros/roleta.ogg");
+                try { new Audio("efeitosonoros/abertura.ogg").play().catch(()=>{}); } catch(e){}
+
+                // Inicia a lógica da arena após o giro
+                setTimeout(() => iniciarPartidaAposGiro(sortei), 3200);
+            }, 50);
+        } else {
+            // Se a roleta não existir, inicia direto (segurança)
+            iniciarPartidaAposGiro(Math.random() > 0.5 ? "VOCÊ" : "MÁQUINA");
+        }
+    } catch (err) {
+        console.error("Erro crítico na roleta:", err);
+        iniciarPartidaAposGiro("VOCÊ"); // Força início em caso de erro
+    }
+}
+
+function iniciarPartidaAposGiro(sortei) {
+    const modal = document.getElementById("modalRoleta");
+    const btn = document.getElementById("btnGirar");
+
+    try {
+        turnoAtual = sortei;
+        tocarSom("efeitosonoros/entrarena.ogg");
+
+        // --- 2. PREPARAÇÃO DE DADOS (DENTRO DE TRY-CATCH) ---
+        let deckBase = [];
+        try {
+            const storedDeck = localStorage.getItem(`deck_build_${usuario}`);
+            deckBase = storedDeck ? JSON.parse(storedDeck) : [];
+        } catch(e) { deckBase = []; }
+
+        if (!Array.isArray(deckBase)) deckBase = [];
+        
+        meuDeck = deckBase.map(c => {
+            if (c && typeof c === 'object' && Math.random() <= 0.10) {
+                return { nome: "Equipar", imagem: "imagens/especiais/equipar.jpg", tipo: "especial" };
+            }
+            return c;
+        }).filter(Boolean);
+
+        // Deck Máquina
+        let mInfo = (monstrosPorNivel && monstrosPorNivel[nivelAtual]) || { nome: "Guerreiro", pasta: "guerreiros", imgPrefix: "guerreiro", atk: 1000, def: 800 };
+        deckOponente = [];
+        for (let i = 0; i < 21; i++) {
+            let imgNum = Math.floor(Math.random() * 5) + 1;
+            deckOponente.push({ 
+                nome: `${mInfo.nome} ${imgNum}`, 
+                imagem: `imagens/${mInfo.pasta}/${mInfo.imgPrefix}${imgNum}.jpg`, 
+                tipo: "monstro", ataque: mInfo.atk, defesa: mInfo.def 
             });
         }
-    }
-}
+        const esps = ["vida", "powerup", "powerdown", "bloqueio", "chamado", "trocal", "equipar"];
+        esps.forEach(e => deckOponente.push({ nome: e.toUpperCase(), imagem: `imagens/especiais/${e}.jpg`, tipo: "especial" }));
+        
+        deckOponente.sort(() => Math.random() - 0.5);
+        meuDeck.sort(() => Math.random() - 0.5);
 
-// === COMBATE ===
-function clicarMonstroJogador(i) {
-    if (turnoAtual !== "VOCÊ" || !monstrosJogador[i]) return;
+        // --- 3. DISTRIBUIÇÃO INICIAL DE CARTAS (ANTES DA ANIMAÇÃO) ---
+        minhaMao = []; maoOponente = [];
+        for (let i = 0; i < 3; i++) {
+            if (meuDeck && meuDeck.length > 0) minhaMao.push(meuDeck.pop());
+            if (deckOponente && deckOponente.length > 0) maoOponente.push(deckOponente.pop());
+        }
 
-    if (atacanteSelecionadoIdx === i) {
-        atacanteSelecionadoIdx = null;
+        // --- 4. ANIMAÇÃO DE ENTRADA ---
+        vidaJogador = 0; vidaOponente = 0;
         atualizarTela();
-        return;
-    }
+        
+        animarContagemHP("vidaJogador", 0, 5000, 1500);
+        animarContagemHP("vidaOponente", 0, 5000, 1500);
+        
+        vidaJogador = 5000; vidaOponente = 5000;
 
-    const m = monstrosJogador[i];
-    const botoes = document.getElementById("botoesAcao");
-    botoes.innerHTML = "";
-
-    const podeAtacar = m.modo === "ataque" && !m.jaAtacou && !primeiroTurnoDoJogo && (m.bloqueadoPor || 0) === 0;
-    if (podeAtacar) {
-        botoes.innerHTML += `<button onclick="selecionarAtacante(${i}); fecharModal()">ATACAR</button>`;
-    }
-    if ((m.bloqueadoPor || 0) > 0) {
-        botoes.innerHTML += `<div style="color:#a00;padding:8px;">BLOQUEADO (${m.bloqueadoPor} rodadas)</div>`;
-    }
-    if (!jaMudouPosicao && !m.jaAtacou) {
-        const novaModo = m.modo === "ataque" ? "DEFESA" : "ATAQUE";
-        botoes.innerHTML += `<button onclick="mudarPosicao(${i}); fecharModal()">MUDAR PARA ${novaModo}</button>`;
-    }
-
-    if (botoes.innerHTML === "") return;
-    document.getElementById("textoModal").innerText = (m.nome || "MONSTRO").toUpperCase();
-    document.getElementById("modalPosicao").style.display = "flex";
-}
-
-function mudarPosicao(i) {
-    if (turnoAtual !== "VOCÊ" || !monstrosJogador[i] || jaMudouPosicao) return;
-    const m = monstrosJogador[i];
-    m.modo = m.modo === "ataque" ? "defesa" : "ataque";
-    m.revelada = m.modo === "ataque";
-    m.jaAtacou = true;
-    jaMudouPosicao = true;
-    addLog(`<b>${m.nome}</b> mudou para modo ${m.modo.toUpperCase()}.`, "info");
-    atualizarTela();
-}
-
-function selecionarAtacante(i) {
-    if (turnoAtual !== "VOCÊ" || !monstrosJogador[i]) return;
-    if (monstrosJogador[i].modo !== "ataque") return;
-    if (monstrosJogador[i].jaAtacou) return;
-    if ((monstrosJogador[i].bloqueadoPor || 0) > 0) return alert("Este monstro está bloqueado!");
-    atacanteSelecionadoIdx = i;
-    atualizarTela();
-}
-
-function atacar(alvoIdx) {
-    if (turnoAtual !== "VOCÊ" || atacanteSelecionadoIdx === null) return;
-    if (primeiroTurnoDoJogo) return alert("Quem começa a partida não pode atacar!");
-
-    const atkMonstro = monstrosJogador[atacanteSelecionadoIdx];
-    const defMonstro = monstrosOponente[alvoIdx];
-    const temMonstrosOponente = monstrosOponente.some(m => m !== null);
-
-    if (!temMonstrosOponente) {
-        vidaOponente -= atkMonstro.ataque;
-        addLog(`<b>${atkMonstro.nome}</b> ataca direto! Máquina perde ${atkMonstro.ataque} LP.`, "dano");
-    } else if (defMonstro) {
-        defMonstro.revelada = true;
-
-        if (defMonstro.modo === "ataque") {
-            if (atkMonstro.ataque > defMonstro.ataque) {
-                const dif = atkMonstro.ataque - defMonstro.ataque;
-                vidaOponente -= dif;
-                cemiterioOponente.push({ ...monstrosOponente[alvoIdx] });
-                monstrosOponente[alvoIdx] = null;
-                addLog(`<b>${atkMonstro.nome}</b> destruiu <b>${defMonstro.nome}</b>! Máquina perde ${dif} LP.`, "dano");
-            } else if (atkMonstro.ataque < defMonstro.ataque) {
-                const dif = defMonstro.ataque - atkMonstro.ataque;
-                vidaJogador -= dif;
-                cemiterioJogador.push({ ...monstrosJogador[atacanteSelecionadoIdx] });
-                monstrosJogador[atacanteSelecionadoIdx] = null;
-                addLog(`<b>${atkMonstro.nome}</b> foi destruído por <b>${defMonstro.nome}</b>! Você perde ${dif} LP.`, "morte");
-            } else {
-                cemiterioOponente.push({ ...monstrosOponente[alvoIdx] });
-                monstrosOponente[alvoIdx] = null;
-                cemiterioJogador.push({ ...monstrosJogador[atacanteSelecionadoIdx] });
-                monstrosJogador[atacanteSelecionadoIdx] = null;
-                addLog(`<b>${atkMonstro.nome}</b> e <b>${defMonstro.nome}</b> se destruíram mutuamente!`, "morte");
+        // --- 5. LIBERAÇÃO DO JOGO ---
+        setTimeout(() => {
+            if (modal) modal.style.display = "none";
+            const btnPassar = document.getElementById("btnPassarTurno");
+            if (btnPassar) btnPassar.style.display = "block";
+            
+            const aviso = document.getElementById("turnoAviso");
+            if (aviso) aviso.innerText = "TURNO: " + turnoAtual;
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "GIRAR";
             }
-        } else {
-            const defVal = defMonstro.defesa || defMonstro.ataque;
-            if (atkMonstro.ataque > defVal) {
-                cemiterioOponente.push({ ...monstrosOponente[alvoIdx] });
-                monstrosOponente[alvoIdx] = null;
-                addLog(`<b>${atkMonstro.nome}</b> destruiu <b>${defMonstro.nome}</b> (defesa).`, "dano");
-            } else if (atkMonstro.ataque < defVal) {
-                const dif = defVal - atkMonstro.ataque;
-                vidaJogador -= dif;
-                addLog(`Defesa de <b>${defMonstro.nome}</b> resistiu! Você perde ${dif} LP.`, "dano");
-            } else {
-                addLog(`Ataque igualou a defesa de <b>${defMonstro.nome}</b>. Nada acontece.`, "info");
-            }
+
+            atualizarTela();
+            if (turnoAtual === "MÁQUINA") setTimeout(turnoDaMaquina, 1000);
+        }, 1800);
+
+    } catch (err) {
+        console.error("Erro ao iniciar partida:", err);
+        if (modal) modal.style.display = "none";
+        atualizarTela();
+    }
+}
+
+/* === LÓGICA DE COMBATE === */
+function acaoMonstro(idx) {
+    if (turnoAtual !== "VOCÊ") return;
+    let m = monstrosJogador[idx];
+    if (!m) return;
+    let acoes = [];
+    // Regra: Não pode atacar se for o primeiríssimo turno da partida (quem começou)
+    const podeAtacarTurno = totalTurnosPartida > 0;
+    if (m.modo === "ataque" && !m.jaAtacou && !m.bloqueado && podeAtacarTurno) acoes.push("ATACAR");
+    if (!m.jaAtacou && !m.acabouDeSerInvocado) {
+        acoes.push(m.modo === "ataque" ? "MUDAR PARA DEFESA" : "MUDAR PARA ATAQUE");
+    }
+    if (acoes.length === 0) return;
+    mostrarSelecao(m.nome.toUpperCase(), acoes, (sel) => {
+        if (acoes[sel] === "ATACAR") prepararAtaque(idx);
+        else {
+            m.modo = (m.modo === "ataque" ? "defesa" : "ataque");
+            m.revelada = (m.modo === "ataque");
+            m.mudouPosicaoNesteTurno = true; // pode atacar após mudar para ATK
+            atualizarTela();
+        }
+    });
+}
+
+function prepararAtaque(idx) {
+    let meu = monstrosJogador[idx];
+    let alvos = monstrosOponente.map((m, i) => m ? {i, label: m.revelada ? m.nome : `MONSTRO OCULTO (${i+1})`} : null).filter(Boolean);
+    if (alvos.length === 0) {
+        if (confirm("Atacar diretamente?")) {
+            tocarSom("efeitosonoros/ataque.ogg"); // Toca logo que clica no alvo/confirm
+            animarAtaque(idx, null, true, () => {
+                alterarVida("oponente", vidaOponente - meu.ataque);
+                meu.jaAtacou = true;
+                logBatalha(`Ataque direto! -${meu.ataque} LP`, "dano");
+                verificarFimJogo();
+            });
         }
     } else {
-        return;
+        mostrarSelecao("ALVO", alvos.map(a => a.label), (s) => {
+            tocarSom("efeitosonoros/ataque.ogg"); // Toca logo que escolhe o monstro a ser atacado
+            animarAtaque(idx, alvos[s].i, true, () => {
+                resolverCombate(idx, alvos[s].i, true);
+            });
+        });
     }
+}
 
-    if (monstrosJogador[atacanteSelecionadoIdx]) atkMonstro.jaAtacou = true;
-    atacanteSelecionadoIdx = null;
-    verificarFimDeJogo();
+function resolverCombate(mIdx, oIdx, atacanteEhJogador) {
+    let atacante = atacanteEhJogador ? monstrosJogador[mIdx] : monstrosOponente[mIdx];
+    let defensor = atacanteEhJogador ? monstrosOponente[oIdx] : monstrosJogador[oIdx];
+    if (!atacante || !defensor) return;
+
+    const nomeDefensorOriginal = defensor.revelada ? defensor.nome : "um monstro oculto";
+    defensor.revelada = true;
+    
+    let pontosDef = defensor.modo === "ataque" ? defensor.ataque : defensor.defesa;
+    let dif = atacante.ataque - pontosDef;
+    
+    if (dif > 0) {
+        logBatalha(`${atacante.nome} destruiu ${nomeDefensorOriginal}!`, "cura");
+        
+        // --- REMOVER BLOQUEIO SE O ALVO FOR DESTRUÍDO ---
+        if (defensor.bloqueado) {
+            const listaEspeciais = atacanteEhJogador ? especiaisJogador : especiaisOponente;
+            const cemiterioDestino = atacanteEhJogador ? cemiterioJogador : cemiterioOponente;
+            
+            const idxEsp = listaEspeciais.findIndex(e => e && e.vinculo === oIdx && e.imagem.includes("bloqueio.jpg"));
+            if (idxEsp !== -1) {
+                cemiterioDestino.push(listaEspeciais[idxEsp]);
+                listaEspeciais[idxEsp] = null;
+                logBatalha("Efeito de Bloqueio encerrado pois o alvo foi destruído.", "info");
+            }
+        }
+
+        if (defensor.modo === "ataque") {
+            if (atacanteEhJogador) {
+                alterarVida("oponente", vidaOponente - dif);
+            } else {
+                alterarVida("jogador", vidaJogador - dif);
+            }
+        }
+        if (atacanteEhJogador) { cemiterioOponente.push(defensor); monstrosOponente[oIdx] = null; }
+        else { cemiterioJogador.push(defensor); monstrosJogador[oIdx] = null; }
+    } else if (dif < 0) {
+        let danoRef = Math.abs(dif);
+        if (atacanteEhJogador) {
+            alterarVida("jogador", vidaJogador - danoRef);
+        } else {
+            alterarVida("oponente", vidaOponente - danoRef);
+        }
+        logBatalha(`Contra-ataque! Perda de ${danoRef} LP.`, "dano");
+        if (defensor.modo === "ataque") {
+            if (atacanteEhJogador) { cemiterioJogador.push(atacante); monstrosJogador[mIdx] = null; }
+            else { cemiterioOponente.push(atacante); monstrosOponente[mIdx] = null; }
+        }
+    } else {
+        logBatalha("Empate!", "morte");
+        cemiterioJogador.push(atacanteEhJogador ? atacante : defensor);
+        cemiterioOponente.push(atacanteEhJogador ? defensor : atacante);
+        monstrosJogador[atacanteEhJogador ? mIdx : oIdx] = null;
+        monstrosOponente[atacanteEhJogador ? oIdx : mIdx] = null;
+    }
+    if (atacante) atacante.jaAtacou = true;
+    verificarFimJogo();
     atualizarTela();
 }
 
-// === INTELIGÊNCIA DA MÁQUINA ===
 function turnoDaMaquina() {
-    if (deckOponente.length > 0) maoOponente.push(deckOponente.pop());
+    comprarCarta("oponente");
+    totalTurnosPartida++; // Incrementa turno
+    
+    // --- 1. USO DE CARTAS ESPECIAIS DA MÃO ---
+    let especiaisMao = maoOponente.filter(c => c.tipo === "especial");
+    especiaisMao.forEach(esp => {
+        const img = esp.imagem.toLowerCase();
+        let usou = false;
 
-    // Máquina usa cartas especiais antes de invocar monstro
-    for (let idx = maoOponente.length - 1; idx >= 0; idx--) {
-        const carta = maoOponente[idx];
-        if (carta.tipo !== "especial") continue;
-        const efeito = carta.efeito || "";
-        const img = carta.imagem || "";
-
-        if (efeito === "aumenta500" || img.includes("powerup")) {
-            const alvos = monstrosOponente.map((m, i) => m ? i : null).filter(i => i !== null);
+        if (img.includes("vida.jpg") && vidaOponente < 4000) {
+            alterarVida("oponente", vidaOponente + 500);
+            logBatalha(`Máquina usou Vida e recuperou 500 LP!`, "cura");
+            usou = true;
+        } else if (img.includes("powerup.jpg")) {
+            let alvos = monstrosOponente.filter(m => m !== null);
             if (alvos.length > 0) {
-                const alvoIdx = alvos.reduce((best, i) =>
-                    monstrosOponente[i].ataque > monstrosOponente[best].ataque ? i : best, alvos[0]);
-                monstrosOponente[alvoIdx].ataque += 300;
-                monstrosOponente[alvoIdx].defesa = (monstrosOponente[alvoIdx].defesa || 0) + 300;
-                addLog(`Máquina ativou <b>Power Up</b>! <b>${monstrosOponente[alvoIdx].nome}</b> ficou mais forte! +300 ATK/DEF.`, "dano");
-                maoOponente.splice(idx, 1);
+                tocarSom("efeitosonoros/powerup.ogg");
+                let alvo = alvos.sort((a,b) => b.ataque - a.ataque)[0];
+                alvo.ataque += 300; alvo.defesa += 300;
+                logBatalha(`Máquina usou PowerUp em ${alvo.nome}`, "info");
+                usou = true;
             }
-        } else if (efeito === "diminui500" || img.includes("powerdown")) {
-            const alvos = monstrosJogador.map((m, i) => m ? i : null).filter(i => i !== null);
+        } else if (img.includes("powerdown.jpg")) {
+            let alvosJ = monstrosJogador.filter(m => m !== null);
+            if (alvosJ.length > 0) {
+                tocarSom("efeitosonoros/powerdown.ogg");
+                let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
+                alvo.ataque = Math.max(0, alvo.ataque - 300);
+                alvo.defesa = Math.max(0, alvo.defesa - 300);
+                logBatalha(`Máquina usou PowerDown em ${alvo.nome}`, "dano");
+                usou = true;
+            }
+        } else if (img.includes("bloqueio.jpg")) {
+            let alvosJ = monstrosJogador.filter(m => m !== null && !m.bloqueado);
+            if (alvosJ.length > 0) {
+                let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
+                let idxJ = monstrosJogador.indexOf(alvo);
+                let slotEsp = especiaisOponente.findIndex(s => s === null);
+                if (slotEsp !== -1) {
+                    tocarSom("efeitosonoros/carta.ogg");
+                    alvo.bloqueado = true;
+                    alvo.turnosBloqueio = 3;
+                    especiaisOponente[slotEsp] = { ...esp, revelada: true, vinculo: idxJ, turnosRestantes: 3 };
+                    logBatalha(`Máquina bloqueou ${alvo.nome}!`, "info");
+                    usou = true;
+                }
+            }
+        } else if (img.includes("chamado.jpg")) {
+            let alvosJ = monstrosJogador.filter(m => m !== null);
+            if (alvosJ.length > 0) {
+                tocarSom("efeitosonoros/carta.ogg");
+                let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
+                let idxJ = monstrosJogador.indexOf(alvo);
+                
+                // ... (remover bloqueio) ...
+                if (alvo.bloqueado) {
+                    const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idxJ && e.imagem.includes("bloqueio.jpg"));
+                    if (idxEsp !== -1) {
+                        cemiterioOponente.push(especiaisOponente[idxEsp]);
+                        especiaisOponente[idxEsp] = null;
+                    }
+                }
+
+                cemiterioJogador.push(monstrosJogador[idxJ]);
+                monstrosJogador[idxJ] = null;
+                logBatalha(`Máquina usou Chamado e destruiu ${alvo.nome}!`, "info");
+                usou = true;
+            }
+        } else if (img.includes("trocal.jpg")) {
+            let alvosJ = monstrosJogador.filter(m => m !== null);
+            let slotLivre = monstrosOponente.findIndex(s => s === null);
+            if (alvosJ.length > 0 && slotLivre !== -1) {
+                tocarSom("efeitosonoros/trocal.ogg");
+                let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
+                let idxJ = monstrosJogador.indexOf(alvo);
+
+                // --- REMOVER BLOQUEIO DA MÁQUINA SE O ALVO DO JOGADOR FOR ROUBADO ---
+                if (alvo.bloqueado) {
+                    const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idxJ && e.imagem.includes("bloqueio.jpg"));
+                    if (idxEsp !== -1) {
+                        cemiterioOponente.push(especiaisOponente[idxEsp]);
+                        especiaisOponente[idxEsp] = null;
+                    }
+                }
+
+                monstrosOponente[slotLivre] = { 
+                    ...alvo, 
+                    roubado: true, 
+                    turnosRoubo: 2, 
+                    donoOriginal: "jogador", 
+                    revelada: true, 
+                    jaAtacou: false,
+                    bloqueado: false // Limpa bloqueio ao mudar de lado
+                };
+                monstrosJogador[idxJ] = null;
+                logBatalha(`Máquina usou Trocal e roubou seu ${alvo.nome}!`, "info");
+                usou = true;
+            }
+        } else if (img.includes("despertar.jpg")) {
+            let monstrosCemiterio = cemiterioOponente.filter(c => c.tipo === "monstro");
+            if (monstrosCemiterio.length > 0 && maoOponente.length < 5) {
+                tocarSom("efeitosonoros/carta.ogg");
+                let m = monstrosCemiterio.sort((a,b) => b.ataque - a.ataque)[0];
+                cemiterioOponente.splice(cemiterioOponente.indexOf(m), 1);
+                maoOponente.push(m);
+                logBatalha(`Máquina despertou ${m.nome} do cemitério!`, "info");
+                usou = true;
+            }
+        } else if (img.includes("equipar.jpg")) {
+            let alvos = monstrosOponente.filter(m => m !== null && !m.imagem.includes("robo"));
             if (alvos.length > 0) {
-                const alvoIdx = alvos.reduce((best, i) =>
-                    monstrosJogador[i].ataque > monstrosJogador[best].ataque ? i : best, alvos[0]);
-                const nome = monstrosJogador[alvoIdx].nome;
-                monstrosJogador[alvoIdx].ataque = Math.max(0, monstrosJogador[alvoIdx].ataque - 300);
-                monstrosJogador[alvoIdx].defesa = Math.max(0, (monstrosJogador[alvoIdx].defesa || 0) - 300);
-                addLog(`Máquina ativou <b>Power Down</b>! <b>${nome}</b> ficou mais fraco! -300 ATK/DEF.`, "morte");
-                maoOponente.splice(idx, 1);
+                const robos = [
+                    { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800, nivelReq: 1 },
+                    { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000, nivelReq: 2 },
+                    { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200, nivelReq: 3 },
+                    { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500, nivelReq: 4 },
+                    { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800, nivelReq: 5 }
+                ].filter(r => nivelAtual >= r.nivelReq);
+                if (robos.length > 0) {
+                    tocarSom("efeitosonoros/equipar.ogg");
+                    let robo = robos[robos.length - 1]; // Pega o melhor robô disponível
+                    let alvo = alvos.sort((a,b) => a.ataque - b.ataque)[0]; // Equipar no mais fraco
+                    if (alvo.ataque < robo.ataque) {
+                        alvo.nome = robo.nome; alvo.imagem = robo.imagem;
+                        alvo.ataque = robo.ataque; alvo.defesa = robo.defesa;
+                        logBatalha(`Máquina equipou ${robo.nome}!`, "info");
+                        usou = true;
+                    }
+                }
+            }
+        } else if (img.includes("fusao.jpg")) {
+            let monstrosCampo = monstrosOponente.filter(m => m !== null);
+            let monstrosMao = maoOponente.filter(c => c.tipo === "monstro");
+            if (monstrosCampo.length > 0 && monstrosMao.length > 0) {
+                tocarSom("efeitosonoros/fusao.ogg");
+                let mutante;
+                if (nivelAtual <= 5) mutante = { nome: "Mutante 1", imagem: "imagens/mutantes/mutante1.jpg", ataque: 2500, defesa: 2000, tipo: "monstro" };
+                else if (nivelAtual <= 10) mutante = { nome: "Mutante 2", imagem: "imagens/mutantes/mutante2.jpg", ataque: 3000, defesa: 2500, tipo: "monstro" };
+                else mutante = { nome: "Mutante 3", imagem: "imagens/mutantes/mutante3.jpg", ataque: 3500, defesa: 2900, tipo: "monstro" };
+                
+                let mCampo = monstrosCampo.sort((a,b) => a.ataque - b.ataque)[0];
+                let mMao = monstrosMao.sort((a,b) => a.ataque - b.ataque)[0];
+                
+                cemiterioOponente.push(mCampo);
+                cemiterioOponente.push(maoOponente.splice(maoOponente.indexOf(mMao), 1)[0]);
+                
+                let idxCampo = monstrosOponente.indexOf(mCampo);
+                monstrosOponente[idxCampo] = { ...mutante, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                tocarSom("efeitosonoros/carta.ogg");
+                logBatalha(`Máquina realizou Fusão: ${mutante.nome}!`, "info");
+                usou = true;
             }
         }
-    }
 
-    // Invoca monstro
-    let monIdx = maoOponente.findIndex(c => c.tipo === "monstro");
-    let slotM = monstrosOponente.findIndex(s => s === null);
-    if (monIdx !== -1 && slotM !== -1) {
-        let modo = Math.random() > 0.4 ? "ataque" : "defesa";
-        monstrosOponente[slotM] = {
-            ...maoOponente[monIdx],
-            modo: modo,
-            revelada: modo === "ataque",
-            jaAtacou: false,
-            bloqueadoPor: 0
-        };
-        addLog(`Máquina invocou um monstro em modo ${modo === "ataque" ? "ATAQUE" : "<i>oculto</i>"}.`, "info");
-        maoOponente.splice(monIdx, 1);
-    }
+        if (usou) {
+            maoOponente.splice(maoOponente.indexOf(esp), 1);
+            cemiterioOponente.push(esp);
+            atualizarTela();
+        }
+    });
 
-    if (!primeiroTurnoDoJogo) {
-        monstrosOponente.forEach((m, idx) => {
-            if (!m || m.modo !== "ataque" || (m.bloqueadoPor || 0) > 0) return;
-
-            const alvosVivos = monstrosJogador.map((mj, i) => mj ? i : null).filter(i => i !== null);
-            if (alvosVivos.length === 0) {
-                vidaJogador -= m.ataque;
-                addLog(`<b>${m.nome}</b> (máq) ataca direto! Você perde ${m.ataque} LP.`, "dano");
-            } else {
-                let alvoIdx = alvosVivos[0];
-                let alvo = monstrosJogador[alvoIdx];
-
-                if (alvo.modo === "ataque") {
-                    if (m.ataque > alvo.ataque) {
-                        const dif = m.ataque - alvo.ataque;
-                        vidaJogador -= dif;
-                        cemiterioJogador.push({ ...monstrosJogador[alvoIdx] });
-                        monstrosJogador[alvoIdx] = null;
-                        addLog(`<b>${m.nome}</b> (máq) destruiu <b>${alvo.nome}</b>! Você perde ${dif} LP.`, "morte");
-                    } else if (m.ataque < alvo.ataque) {
-                        const dif = alvo.ataque - m.ataque;
-                        vidaOponente -= dif;
-                        cemiterioOponente.push({ ...monstrosOponente[idx] });
-                        monstrosOponente[idx] = null;
-                        addLog(`<b>${alvo.nome}</b> destruiu <b>${m.nome}</b> (máq)! Máquina perde ${dif} LP.`, "dano");
-                    } else {
-                        cemiterioJogador.push({ ...monstrosJogador[alvoIdx] });
-                        monstrosJogador[alvoIdx] = null;
-                        cemiterioOponente.push({ ...monstrosOponente[idx] });
-                        monstrosOponente[idx] = null;
-                        addLog(`<b>${m.nome}</b> e <b>${alvo.nome}</b> se destruíram mutuamente!`, "morte");
+    // --- 2. INVOCAÇÃO DE MONSTROS ---
+    let monstrosMao = maoOponente.filter(c => c.tipo === "monstro");
+    if (monstrosMao.length > 0) {
+        // Tenta sacrifício primeiro
+        let monSac = monstrosMao.filter(m => m.sacrifio > 0).sort((a,b) => b.ataque - a.ataque)[0];
+        let monstrosNoCampo = monstrosOponente.filter(m => m !== null);
+        
+        if (monSac && monstrosNoCampo.length >= monSac.sacrifio) {
+            let sacrificados = monstrosNoCampo.sort((a,b) => a.ataque - b.ataque).slice(0, monSac.sacrifio);
+            sacrificados.forEach(s => {
+                // --- REMOVER BLOQUEIO DA MÁQUINA SE O SACRIFICADO ESTIVER BLOQUEADO ---
+                if (s.bloqueado) {
+                    const idxEsp = especiaisJogador.findIndex(e => e && e.vinculo === monstrosOponente.indexOf(s) && e.imagem.includes("bloqueio.jpg"));
+                    if (idxEsp !== -1) {
+                        cemiterioJogador.push(especiaisJogador[idxEsp]);
+                        especiaisJogador[idxEsp] = null;
                     }
+                }
+                cemiterioOponente.push(s);
+                monstrosOponente[monstrosOponente.indexOf(s)] = null;
+            });
+
+            // Som de sacrifício para a máquina
+            tocarSom("efeitosonoros/sacrificio.ogg");
+
+            let slot = monstrosOponente.findIndex(s => s === null);
+            monstrosOponente[slot] = { ...monSac, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+            tocarSom("efeitosonoros/carta.ogg");
+            maoOponente.splice(maoOponente.indexOf(monSac), 1);
+            logBatalha(`Máquina invocou por Sacrifício: ${monSac.nome}!`, "info");
+        } else {
+            // Invocação Normal
+            let monNorm = monstrosMao.filter(m => !m.sacrifio).sort((a,b) => b.ataque - a.ataque)[0];
+            let slot = monstrosOponente.findIndex(s => s === null);
+            if (monNorm && slot !== -1) {
+                // Inteligência de Modo: Se for robô ou forte, prefere ataque
+                let modoIA = "ataque";
+                const monstrosJogadorAtivos = monstrosJogador.filter(m => m !== null);
+                const monstrosMaisFortesQueEu = monstrosJogadorAtivos.filter(m => (m.modo === "ataque" ? m.ataque : m.defesa) > monNorm.ataque);
+                
+                // Se tiver 2 ou mais monstros mais fortes que o que vou invocar, coloco em defesa
+                if (monstrosMaisFortesQueEu.length >= 2 || vidaOponente < 1500) {
+                    modoIA = "defesa";
+                }
+                
+                monstrosOponente[slot] = { ...monNorm, modo: modoIA, revelada: (modoIA === "ataque"), jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                tocarSom("efeitosonoros/carta.ogg");
+                maoOponente.splice(maoOponente.indexOf(monNorm), 1);
+            }
+        }
+        atualizarTela();
+    }
+
+    setTimeout(() => {
+        // --- 3. FASE DE BATALHA E AJUSTE DE POSIÇÃO DA IA ---
+        // ... (lógica de posição) ...
+        monstrosOponente.forEach((m, idx) => {
+            if (m && m.modo === "defesa" && !m.acabouDeSerInvocado && !m.bloqueado) {
+                const monstrosJogadorAtivos = monstrosJogador.filter(mj => mj !== null);
+                const monstrosMaisFortesQueEu = monstrosJogadorAtivos.filter(mj => (mj.modo === "ataque" ? mj.ataque : mj.defesa) > m.ataque);
+                
+                if (monstrosMaisFortesQueEu.length < 2) {
+                    m.modo = "ataque";
+                    m.revelada = true;
+                    logBatalha(`Máquina mudou ${m.nome} para modo de ATK!`, "info");
+                }
+            }
+        });
+
+        monstrosOponente.forEach((m, idx) => {
+            if (m && m.modo === "ataque" && !m.jaAtacou && !m.bloqueado && !m.acabouDeSerInvocado && totalTurnosPartida > 0) {
+                let alvosValidos = monstrosJogador.map((mj, i) => mj ? { ...mj, originalIdx: i } : null).filter(v => v !== null);
+                
+                if (alvosValidos.length === 0) {
+                    tocarSom("efeitosonoros/ataque.ogg");
+                    animarAtaque(idx, null, false, () => {
+                        alterarVida("jogador", vidaJogador - m.ataque);
+                        logBatalha(`Máquina atacou direto! -${m.ataque} LP`, "dano");
+                        m.jaAtacou = true;
+                    });
                 } else {
-                    const defVal = alvo.defesa || alvo.ataque;
-                    if (m.ataque > defVal) {
-                        cemiterioJogador.push({ ...monstrosJogador[alvoIdx] });
-                        monstrosJogador[alvoIdx] = null;
-                        addLog(`<b>${m.nome}</b> (máq) destruiu <b>${alvo.nome}</b> em defesa.`, "morte");
-                    } else if (m.ataque < defVal) {
-                        const dif = defVal - m.ataque;
-                        vidaOponente -= dif;
-                        cemiterioOponente.push({ ...monstrosOponente[idx] });
-                        monstrosOponente[idx] = null;
-                        addLog(`Defesa de <b>${alvo.nome}</b> resistiu! Máquina perde ${dif} LP.`, "dano");
+                    let alvosVenciveis = alvosValidos.filter(alvo => m.ataque > (alvo.modo === "ataque" ? alvo.ataque : alvo.defesa));
+                    if (alvosVenciveis.length > 0) {
+                        alvosVenciveis.sort((a,b) => (a.modo === "ataque" ? a.ataque : a.defesa) - (b.modo === "ataque" ? b.ataque : b.defesa));
+                        const alvoEscolhido = alvosVenciveis[alvosVenciveis.length-1];
+                        tocarSom("efeitosonoros/ataque.ogg");
+                        animarAtaque(idx, alvoEscolhido.originalIdx, false, () => {
+                            resolverCombate(idx, alvoEscolhido.originalIdx, false);
+                        });
                     }
                 }
             }
         });
-    }
 
-    setTimeout(() => {
-        verificarFimDeJogo();
-        if (vidaJogador > 0 && vidaOponente > 0) {
-            addLog("Vez de <b>VOCÊ</b>.", "info");
-            turnoAtual = "VOCÊ";
-            primeiroTurnoDoJogo = false;
-            resetarTurno();
-            atualizarTela();
+        setTimeout(() => {
+            // --- 4. FIM DO TURNO DA MÁQUINA ---
+            finalizarTurnoMaquina();
+        }, 1000);
+    }, 1000);
+}
+
+function verificarFimJogo() {
+    if (fimDeRodadaProcessando) return;
+
+    if (vidaJogador <= 0) { 
+        fimDeRodadaProcessando = true;
+        vitoriasRodadaOponente++;
+        atualizarPlacarMelhorDe3();
+        
+        setTimeout(() => {
+            if (vitoriasRodadaOponente >= 2) {
+                mostrarDerrota();
+                resetarMelhorDe3();
+            } else {
+                proximaRodada("MÁQUINA");
+            }
+        }, 1000);
+        return;
+    }
+    if (vidaOponente <= 0) { 
+        fimDeRodadaProcessando = true;
+        vitoriasRodadaJogador++;
+        atualizarPlacarMelhorDe3();
+        
+        setTimeout(() => {
+            if (vitoriasRodadaJogador >= 2) {
+                concederPremios();
+                resetarMelhorDe3();
+            } else {
+                proximaRodada("VOCÊ");
+            }
+        }, 1000);
+    }
+}
+
+function atualizarPlacarMelhorDe3() {
+    const el = document.getElementById("placarMelhorDe3");
+    if (el) {
+        const estrelas = parseInt(localStorage.getItem(`vits_no_nivel_${usuario}`)) || 0;
+        let estrelasStr = "";
+        for(let i=0; i<5; i++) {
+            estrelasStr += i < estrelas ? "★" : "☆";
         }
-    }, 1500);
-}
-
-// === EFEITOS DE CARTAS ESPECIAIS ===
-function ativarEfeito(carta, dono, callback) {
-    const efeito = carta.efeito || "";
-    const img = carta.imagem || "";
-
-    function nivelJogadorAtual() {
-        return parseInt(localStorage.getItem(`nivel_${usuario}`)) || 1;
-    }
-    function faixaNivel(n) {
-        if (n <= 5) return 1;
-        if (n <= 10) return 2;
-        if (n <= 15) return 3;
-        if (n <= 20) return 4;
-        return 5;
-    }
-    function chanceFusaoFaixa(faixa) {
-        if (faixa === 1) return 0.98;
-        if (faixa === 2) return 0.90;
-        if (faixa === 3) return 0.85;
-        if (faixa === 4) return 0.80;
-        return 0.75;
-    }
-    function imagemMutanteFaixa(faixa) {
-        if (faixa === 1) return "imagens/mutantes/mutante1.jpg";
-        if (faixa === 2) return "imagens/mutantes/mutante2.jpg";
-        if (faixa === 3) return "imagens/mutantes/mutante3.jpg";
-        if (faixa === 4) return "imagens/mutantes/mutante4.jpg";
-        return "imagens/mutantes/mutante4.jpg";
-    }
-
-    if (efeito === "aumenta500" || img.includes("powerup")) {
-        const alvos = monstrosJogador
-            .map((m, i) => m ? { i, nome: m.nome, atk: m.ataque } : null)
-            .filter(Boolean);
-        if (alvos.length === 0) { alert("Nenhum monstro seu em campo!"); return; }
-        mostrarSelecao(
-            "POTENCIALIZAR QUAL MONSTRO?",
-            alvos.map(a => `${a.nome} (ATK ${a.atk})`),
-            sel => {
-                monstrosJogador[alvos[sel].i].ataque += 300;
-                monstrosJogador[alvos[sel].i].defesa = (monstrosJogador[alvos[sel].i].defesa || 0) + 300;
-                monstrosJogador[alvos[sel].i].buffState = "up";
-                addLog(`<b>${alvos[sel].nome}</b> ficou mais forte! +300 ATK/DEF.`, "cura");
-                if (callback) callback();
-            }
-        );
-        return;
-    }
-
-    if (efeito === "diminui500" || img.includes("powerdown")) {
-        const alvos = monstrosOponente
-            .map((m, i) => m ? { i, nome: m.nome, atk: m.ataque } : null)
-            .filter(Boolean);
-        if (alvos.length === 0) { alert("Nenhum monstro inimigo em campo!"); return; }
-        mostrarSelecao(
-            "ENFRAQUECER QUAL MONSTRO?",
-            alvos.map(a => `${a.nome} (ATK ${a.atk})`),
-            sel => {
-                monstrosOponente[alvos[sel].i].ataque = Math.max(0, monstrosOponente[alvos[sel].i].ataque - 300);
-                monstrosOponente[alvos[sel].i].defesa = Math.max(0, (monstrosOponente[alvos[sel].i].defesa || 0) - 300);
-                monstrosOponente[alvos[sel].i].buffState = "down";
-                addLog(`<b>${alvos[sel].nome}</b> (inimigo) enfraqueceu! -300 ATK/DEF.`, "dano");
-                if (callback) callback();
-            }
-        );
-        return;
-    }
-
-    if (efeito === "fusao" || img.includes("fusao") || img.includes("trocal")) {
-        const maoMons = minhaMao
-            .map((c, i) => c && c.tipo === "monstro" ? { i, c } : null)
-            .filter(Boolean);
-        if (maoMons.length === 0) { alert("Nenhum monstro na sua mão!"); return; }
-        mostrarSelecao(
-            "ESCOLHA UM MONSTRO DA SUA MÃO",
-            maoMons.map(x => `${x.c.nome} (Nível ${x.c.nivel || 1})`),
-            selMao => {
-                const escolhidoMao = maoMons[selMao];
-                const nv = escolhidoMao.c.nivel || 1;
-                const campoCompat = monstrosJogador
-                    .map((m, i) => m && m.tipo === "monstro" && (m.nivel || 1) === nv ? { i, m } : null)
-                    .filter(Boolean);
-                if (campoCompat.length === 0) { alert("Nenhum monstro do mesmo nível no campo!"); return; }
-                mostrarSelecao(
-                    "ESCOLHA UM MONSTRO DO CAMPO PARA FUSÃO",
-                    campoCompat.map(x => `${x.m.nome} (Nível ${x.m.nivel || 1})`),
-                    selCampo => {
-                        const escCampo = campoCompat[selCampo];
-                        const faixa = faixaNivel(nivelJogadorAtual());
-                        const chance = chanceFusaoFaixa(faixa);
-                        const sucesso = Math.random() < chance;
-                        if (!sucesso) {
-                            addLog("Fusão falhou.", "info");
-                            if (callback) callback();
-                            return;
-                        }
-                        const idxMao = escolhidoMao.i;
-                        const idxCampo = escCampo.i;
-                        const cM = escolhidoMao.c;
-                        const cF = escCampo.m;
-                        const novoAtk = Math.floor(((cM.ataque || 0) + (cF.ataque || 0)) / 2) + 300;
-                        const baseDefM = cM.defesa || cM.ataque || 0;
-                        const baseDefF = cF.defesa || cF.ataque || 0;
-                        const novoDef = Math.floor((baseDefM + baseDefF) / 2) + 300;
-                        cemiterioJogador.push({ ...cM });
-                        minhaMao.splice(idxMao, 1);
-                        cemiterioJogador.push({ ...cF });
-                        monstrosJogador[idxCampo] = {
-                            nome: "Mutante",
-                            imagem: imagemMutanteFaixa(faixa),
-                            tipo: "monstro",
-                            ataque: novoAtk,
-                            defesa: novoDef,
-                            nivel: nv,
-                            modo: "ataque",
-                            revelada: true,
-                            jaAtacou: false,
-                            bloqueadoPor: 0
-                        };
-                        addLog("Fusão bem-sucedida! Um Mutante nasceu.", "cura");
-                        atualizarTela();
-                        if (callback) callback();
-                    }
-                );
-            }
-        );
-        return;
-    }
-
-    if (efeito === "bloqueio" || img.includes("bloqueio")) {
-        const alvos = monstrosOponente
-            .map((m, i) => m && m.modo === "ataque" ? { i, nome: m.nome } : null)
-            .filter(Boolean);
-        if (alvos.length === 0) { alert("Nenhum monstro inimigo em modo de ATAQUE!"); return; }
-        mostrarSelecao(
-            "BLOQUEAR QUAL MONSTRO? (3 rodadas)",
-            alvos.map(a => a.nome),
-            sel => {
-                monstrosOponente[alvos[sel].i].bloqueadoPor = 3;
-                if (callback) callback();
-            }
-        );
-        return;
-    }
-
-    if (efeito === "chamado" || img.includes("chamado")) {
-        const alvos = monstrosOponente
-            .map((m, i) => m ? { i, nome: m.nome, modo: m.modo } : null)
-            .filter(Boolean);
-        if (alvos.length === 0) { alert("Nenhum monstro inimigo em campo!"); return; }
-        mostrarSelecao(
-            "ENVIAR AO CEMITÉRIO QUAL MONSTRO?",
-            alvos.map(a => `${a.nome} (${a.modo.toUpperCase()})`),
-            sel => {
-                cemiterioOponente.push({ ...monstrosOponente[alvos[sel].i] });
-                monstrosOponente[alvos[sel].i] = null;
-                if (callback) callback();
-            }
-        );
-        return;
-    }
-
-    if (efeito === "despertar" || img.includes("despertar")) {
-        const todos = [
-            ...cemiterioJogador.map((c, i) => ({ c, origem: "J", i })),
-            ...cemiterioOponente.map((c, i) => ({ c, origem: "O", i }))
-        ].filter(x => x.c.tipo === "monstro");
-
-        if (todos.length === 0) { alert("Nenhum monstro no cemitério!"); return; }
-        mostrarSelecao(
-            "DESPERTAR QUAL MONSTRO?",
-            todos.map(x => `${x.c.nome} (${x.origem === "J" ? "Seu" : "Inimigo"})`),
-            sel => {
-                const escolhido = todos[sel];
-                minhaMao.push({ ...escolhido.c, modo: undefined, revelada: undefined, jaAtacou: undefined, bloqueadoPor: undefined });
-                if (escolhido.origem === "J") cemiterioJogador.splice(escolhido.i, 1);
-                else cemiterioOponente.splice(escolhido.i, 1);
-                if (callback) callback();
-            }
-        );
-        return;
-    }
-
-    if (callback) callback();
-}
-
-function mostrarSelecao(titulo, opcoes, callback) {
-    callbackSelecao = callback;
-    document.getElementById("textoModal").innerText = titulo;
-    const botoes = document.getElementById("botoesAcao");
-    botoes.innerHTML = "";
-    opcoes.forEach((op, i) => {
-        const btn = document.createElement("button");
-        btn.innerText = op;
-        btn.onclick = () => {
-            fecharModal();
-            if (callbackSelecao) {
-                const cb = callbackSelecao;
-                callbackSelecao = null;
-                cb(i);
-            }
-        };
-        botoes.appendChild(btn);
-    });
-    document.getElementById("modalPosicao").style.display = "flex";
-}
-
-function ativacaoSlot(i) {
-    if (turnoAtual !== "VOCÊ" || !especiaisJogador[i]) return;
-    const carta = especiaisJogador[i];
-    if (!carta.revelada) {
-        const botoes = document.getElementById("botoesAcao");
-        botoes.innerHTML = `
-            <button onclick="revelarEAtivarSlot(${i})">REVELAR E ATIVAR</button>`;
-        document.getElementById("textoModal").innerText = "CARTA VIRADA";
-        document.getElementById("modalPosicao").style.display = "flex";
-    } else {
-        ativarEfeito(carta, "VOCÊ", () => {
-            especiaisJogador[i] = null;
-            atualizarTela();
-        });
+        el.innerHTML = `NÍVEL ${nivelAtual} [${estrelasStr}]<br>RODADA ${rodadaAtual}: ${vitoriasRodadaJogador} - ${vitoriasRodadaOponente}`;
     }
 }
 
-function revelarEAtivarSlot(i) {
-    fecharModal();
-    if (!especiaisJogador[i]) return;
-    especiaisJogador[i].revelada = true;
-    const carta = especiaisJogador[i];
-    ativarEfeito(carta, "VOCÊ", () => {
-        especiaisJogador[i] = null;
-        atualizarTela();
-    });
+function resetarMelhorDe3() {
+    vitoriasRodadaJogador = 0;
+    vitoriasRodadaOponente = 0;
+    rodadaAtual = 1;
+    fimDeRodadaProcessando = false;
 }
 
-// === RENDERIZAÇÃO ===
-function atualizarTela() {
-    document.getElementById("vidaJogador").innerText = vidaJogador;
-    document.getElementById("vidaOponente").innerText = vidaOponente;
-    document.getElementById("contador-deck").innerText = meuDeck.length;
-    document.getElementById("turnoAviso").innerText = `TURNO: ${turnoAtual}`;
-
-    renderLinha("monstrosJogador", monstrosJogador, i => clicarMonstroJogador(i), true, false);
-    renderLinha("especiaisJogador", especiaisJogador, i => ativacaoSlot(i), true, true);
-    renderLinha("monstrosOponente", monstrosOponente, i => atacar(i), false, false);
-    renderLinha("especiaisOponente", especiaisOponente, null, false, true);
-
-    // Botão ataque direto: aparece quando atacante selecionado e oponente sem monstros
-    const semMonstrosOp = !monstrosOponente.some(m => m !== null);
-    const btnDireto = document.getElementById("btnAtaqueDireto");
-    if (btnDireto) {
-        btnDireto.style.display =
-            (atacanteSelecionadoIdx !== null && semMonstrosOp && !primeiroTurnoDoJogo)
-                ? "block" : "none";
-    }
-
-    atualizarCemiterio("cemiterioJogador", cemiterioJogador);
-    atualizarCemiterio("cemiterioOponente", cemiterioOponente);
-
-    const maoDiv = document.getElementById("minhaMao");    maoDiv.innerHTML = "";
-    const total = minhaMao.length;
-    minhaMao.forEach((c, i) => {
-        const img = document.createElement("img");
-        img.src = c.imagem;
-        img.className = "carta-mao";
-        const offset = total > 1 ? (i - (total - 1) / 2) : 0;
-        const angle  = offset * 6;
-        const yLift  = Math.abs(offset) * 5;
-        img.style.transform = `rotate(${angle}deg) translateY(${yLift}px)`;
-        img.style.zIndex = i;
-        img.onclick = () => usarDaMao(i);
-        maoDiv.appendChild(img);
+function proximaRodada(vencedorUltima) {
+    // Fecha qualquer overlay existente
+    const overlays = document.querySelectorAll('div[style*="position:fixed"]');
+    overlays.forEach(o => {
+        if (o.innerText.includes("FIM DA RODADA") || o.innerText.includes("VOCÊ PERDEU")) {
+            document.body.removeChild(o);
+        }
     });
 
-    const maoOpDiv = document.getElementById("maoOponente"); if (maoOpDiv) {
-        maoOpDiv.innerHTML = "";
-        const totOp = maoOponente.length;
-        maoOponente.forEach((c, i) => {
-            const img = document.createElement("img");
-            img.src = "imagens/back.jpg";
-            img.className = "carta-mao";
-            const offset = totOp > 1 ? (i - (totOp - 1) / 2) : 0;
-            const angle  = offset * -6;
-            const yLift  = Math.abs(offset) * 5;
-            img.style.transform = `rotate(${angle}deg) translateY(${yLift}px)`;
-            img.style.zIndex = i;
-            maoOpDiv.appendChild(img);
-        });
+    const overlay = document.createElement("div");
+    overlay.id = "overlayFimRodada";
+    overlay.style.position = "fixed";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.width = "100%";
+    overlay.style.height = "100%";
+    overlay.style.background = "rgba(0,0,0,0.85)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.zIndex = "10000";
+    
+    const box = document.createElement("div");
+    box.style.background = "#c2a679";
+    box.style.border = "4px solid #3d2b1f";
+    box.style.padding = "30px";
+    box.style.borderRadius = "10px";
+    box.style.textAlign = "center";
+    box.style.maxWidth = "400px";
+    box.style.width = "90%";
+    
+    const titulo = document.createElement("h2");
+    titulo.style.marginTop = "0";
+    titulo.style.color = "#3d2b1f";
+    titulo.innerText = `FIM DA RODADA ${rodadaAtual}`;
+    
+    const texto = document.createElement("p");
+    texto.style.fontSize = "18px";
+    texto.style.color = "#1a0f08";
+    texto.innerHTML = `Vencedor: <strong>${vencedorUltima}</strong>`;
+    
+    const btnOk = document.createElement("button");
+    btnOk.id = "btnProximaRodadaFinal";
+    btnOk.style.padding = "12px 25px";
+    btnOk.style.background = "#3d2b1f";
+    btnOk.style.color = "gold";
+    btnOk.style.border = "none";
+    btnOk.style.borderRadius = "5px";
+    btnOk.style.fontFamily = "'Cinzel', serif";
+    btnOk.style.fontWeight = "bold";
+    btnOk.style.cursor = "pointer";
+    btnOk.style.marginTop = "15px";
+    btnOk.innerText = "PRÓXIMA RODADA";
+    
+    btnOk.onclick = function() {
+        console.log("Botão Próxima Rodada clicado");
+        document.body.removeChild(overlay);
+        executarResetRodada();
+    };
+
+    box.appendChild(titulo);
+    box.appendChild(texto);
+    box.appendChild(btnOk);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
+function executarResetRodada() {
+    console.log("Executando reset da rodada");
+    fimDeRodadaProcessando = false;
+    
+    // Fecha qualquer overlay que tenha sobrado
+    const overlays = document.querySelectorAll('div[style*="position:fixed"]');
+    overlays.forEach(o => {
+        if (o.id === "overlayFimRodada" || o.innerText.includes("FIM DA RODADA")) {
+            if (o.parentNode) document.body.removeChild(o);
+        }
+    });
+
+    rodadaAtual++;
+    
+    // Resetar estado do jogo para nova rodada
+    vidaJogador = 5000;
+    vidaOponente = 5000;
+    monstrosJogador = [null, null, null];
+    especiaisJogador = [null, null, null];
+    monstrosOponente = [null, null, null];
+    especiaisOponente = [null, null, null];
+    minhaMao = [];
+    maoOponente = [];
+    cemiterioJogador = [];
+    cemiterioOponente = [];
+    jaInvocouMonstro = false;
+    jaComprouCarta = false;
+    totalTurnosPartida = 0;
+
+    // Recarregar deck do jogador
+    meuDeck = JSON.parse(localStorage.getItem(`deck_build_${usuario}`)) || [];
+    
+    atualizarPlacarMelhorDe3();
+    
+    // Reabrir o modal da roleta para decidir quem começa a próxima rodada
+    const modalRoleta = document.getElementById("modalRoleta");
+    if (modalRoleta) modalRoleta.style.display = "flex";
+    
+    const btnGirar = document.getElementById("btnGirar");
+    if (btnGirar) {
+        btnGirar.disabled = false;
+        btnGirar.innerText = "GIRAR";
+    }
+    
+    const turnoAviso = document.getElementById("turnoAviso");
+    if (turnoAviso) turnoAviso.innerText = "SORTEANDO...";
+    
+    // Ocultar botão de passar turno até o novo sorteio
+    const btnPassar = document.getElementById("btnPassarTurno");
+    if (btnPassar) btnPassar.style.display = "none";
+    
+    // Resetar rotação da roleta para permitir novo giro
+    const roletaElement = document.getElementById("roleta");
+    if (roletaElement) {
+        roletaElement.style.transition = "none";
+        roletaElement.style.transform = "rotate(0deg)";
+        void roletaElement.offsetWidth;
+        roletaElement.style.transition = "transform 3s cubic-bezier(0.1, 0, 0.2, 1)";
     }
 
-    // Auto-pass: se for turno do jogador e não houver mais ações disponíveis
-    if (turnoAtual === "VOCÊ") {
-        clearTimeout(window._autoPassTimer);
-        window._autoPassTimer = setTimeout(() => {
-            if (turnoAtual === "VOCÊ" && !jogadorPodeAgir()) {
-                addLog("Nenhuma ação disponível — passando turno automaticamente...", "info");
-                setTimeout(passarTurno, 600);
-            }
-        }, 2000);
+    atualizarPlacarMelhorDe3();
+    atualizarTela();
+}
+
+/* === RENDERIZAÇÃO === */
+function renderCemiterio() {
+    const cj = document.getElementById("cemiterioJogador");
+    if (cj) {
+        cj.innerHTML = "";
+        if (cemiterioJogador.length > 0) {
+            const ultima = cemiterioJogador[cemiterioJogador.length - 1];
+            cj.innerHTML = `<img src="${ultima.imagem}" class="carta-img" style="opacity: 0.6; filter: grayscale(50%);">`;
+        }
+    }
+    const co = document.getElementById("cemiterioOponente");
+    if (co) {
+        co.innerHTML = "";
+        if (cemiterioOponente.length > 0) {
+            const ultimaOp = cemiterioOponente[cemiterioOponente.length - 1];
+            co.innerHTML = `<img src="${ultimaOp.imagem}" class="protection-img" style="opacity: 0.6; filter: grayscale(50%);">`;
+        }
     }
 }
 
-function atualizarCemiterio(id, lista) {
+function renderLinha(id, lista, isJogador, tipoLinha) {
     const el = document.getElementById(id);
-    if (lista.length > 0) {
-        const ultima = lista[lista.length - 1];
-        el.innerHTML = `
-            <img src="${ultima.imagem}" style="width:100%;height:100%;object-fit:cover;opacity:0.75;">
-            <span class="gy-count">${lista.length}</span>`;
-    } else {
-        el.innerHTML = "";
-    }
-}
-
-function renderLinha(id, lista, clique, isJogador, isEspecial) {
-    const el = document.getElementById(id);
+    if (!el) return;
     el.innerHTML = "";
     lista.forEach((c, i) => {
         const div = document.createElement("div");
         div.className = "slot";
-
         if (c) {
+            const imgPath = (c.revelada || isJogador) ? c.imagem : "imagens/back.jpg";
             if (c.modo === "defesa") div.classList.add("modo-defesa");
-            if (isJogador && !isEspecial && atacanteSelecionadoIdx === i) div.classList.add("selecionada");
-            if (clique) div.onclick = () => clique(i);
+            
+            // Container da imagem
+            const img = document.createElement("img");
+            img.src = imgPath;
+            img.className = "carta-img";
+            div.appendChild(img);
 
-            const imgPath = !c.revelada ? "imagens/back.jpg" : c.imagem;
-            div.innerHTML = `<img src="${imgPath}" class="carta-img">`;
-
-            if (c.tipo === "monstro") {
-                if (isJogador || c.revelada) {
-                    const cls = c.buffState === "up" ? "buff-up" : (c.buffState === "down" ? "buff-down" : "");
-                    const defVal = (c.defesa || c.ataque);
-                    div.innerHTML += `<div class="status-dual ${cls}"><span class="stat atk">ATK ${c.ataque}</span><span class="stat def">DEF ${defVal}</span></div>`;
+            if (tipoLinha === "combate" && (c.revelada || isJogador)) {
+                if (c.bloqueado) {
+                    const tag = document.createElement("div");
+                    tag.className = "bloqueio-tag";
+                    tag.innerText = `BLOQUEADO (${c.turnosBloqueio})`;
+                    div.appendChild(tag);
                 }
-                if ((c.bloqueadoPor || 0) > 0) {
-                    div.innerHTML += `<div class="status-badge bloq-badge">BLOQ ${c.bloqueadoPor}</div>`;
-                }
+                
+                const status = document.createElement("div");
+                status.className = "status-dual";
+                status.innerHTML = `
+                    <div class="stat-box">
+                        <span class="stat-label">ATK</span>
+                        <span class="stat-value atk">${c.ataque}</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">DEF</span>
+                        <span class="stat-value def">${c.defesa}</span>
+                    </div>
+                `;
+                div.appendChild(status);
             }
-        } else {
-            if (clique) div.onclick = () => clique(i);
+            
+            if (tipoLinha === "suporte" && c.revelada && c.imagem.includes("bloqueio.jpg")) {
+                const tag = document.createElement("div");
+                tag.className = "alvo-tag";
+                tag.innerText = `ALVO: ${c.vinculo + 1}`;
+                div.appendChild(tag);
+            }
+            
+            if (isJogador && tipoLinha === "combate") div.onclick = () => acaoMonstro(i);
+            if (isJogador && tipoLinha === "suporte") div.onclick = () => acaoEspecial(i);
         }
-
         el.appendChild(div);
     });
 }
 
-// === FIM DE JOGO ===
-function verificarFimDeJogo() {
-    if (vidaJogador <= 0) {
-        addLog("Seus LP chegaram a ZERO. DERROTA!", "morte");
-        const titulo = document.getElementById("resultadoTitulo");
-        titulo.innerText = "DERROTA";
-        titulo.className = "resultado-titulo derrota";
-        document.getElementById("resultadoMensagem").innerHTML =
-            "Seus pontos de vida chegaram a zero.<br>Tente novamente!";
-        document.getElementById("modalResultado").style.display = "flex";
-        return;
-    }
-    if (vidaOponente <= 0) {
-        addLog("LP da máquina chegaram a ZERO. VITÓRIA!", "cura");
+function atualizarTela() {
+    document.getElementById("vidaJogador").innerText = vidaJogador;
+    document.getElementById("vidaOponente").innerText = vidaOponente;
+    document.getElementById("contador-deck").innerText = meuDeck.length;
+    renderLinha("monstrosOponente", monstrosOponente, false, "combate");
+    renderLinha("especiaisOponente", especiaisOponente, false, "suporte");
+    renderLinha("monstrosJogador", monstrosJogador, true, "combate");
+    renderLinha("especiaisJogador", especiaisJogador, true, "suporte");
+    renderCemiterio();
+    
+    const maoDiv = document.getElementById("minhaMao");
+    maoDiv.innerHTML = "";
+    minhaMao.forEach((c, i) => {
+        const carta = document.createElement("div");
+        carta.className = "carta-mao";
+        carta.innerHTML = `<img src="${c.imagem}">`;
+        if (c.tipo === "monstro") carta.innerHTML += `<div class="mao-stats"><span style="color:#3498db">${c.ataque}</span> <span style="color:#ffff00">${c.defesa}</span></div>`;
+        carta.onclick = () => usarDaMao(i);
+        maoDiv.appendChild(carta);
+    });
 
-        let vitorias = parseInt(localStorage.getItem(`vitorias_${usuario}`)) || 0;
-        vitorias++;
-        localStorage.setItem(`vitorias_${usuario}`, vitorias);
+    const maoOpDiv = document.getElementById("maoOponente");
+    maoOpDiv.innerHTML = "";
+    maoOponente.forEach(() => {
+        const d = document.createElement("div");
+        d.className = "carta-mao"; d.innerHTML = `<img src="imagens/back.jpg">`;
+        maoOpDiv.appendChild(d);
+    });
+}
 
-        const novaCarta = sortearCartaRecompensa();
-        const inv = JSON.parse(localStorage.getItem(`deck_inventory_${usuario}`)) || JSON.parse(localStorage.getItem(`deck_${usuario}`)) || [];
-        inv.push({ nome: novaCarta.nome, imagem: novaCarta.imagem, tipo: "monstro", ataque: novaCarta.atk, defesa: novaCarta.def });
-        localStorage.setItem(`deck_inventory_${usuario}`, JSON.stringify(inv));
+function acaoEspecial(idx) {
+    if (turnoAtual !== "VOCÊ") return;
+    let esp = especiaisJogador[idx];
+    if (!esp || esp.revelada) return;
+    
+    mostrarSelecao("ESPECIAL", ["ATIVAR"], (sel) => {
+        if (sel === 0) {
+            tocarSom("efeitosonoros/carta.ogg");
+            ativarEfeitoEspecialCampo(idx);
+        }
+    });
+}
 
-        const titulo = document.getElementById("resultadoTitulo");
-        titulo.innerText = "VITÓRIA!";
-        titulo.className = "resultado-titulo vitoria";
+function usarDaMao(idx) {
+    if (turnoAtual !== "VOCÊ") return;
+    const carta = minhaMao[idx];
+    if (carta.tipo === "monstro") {
+        if (jaInvocouMonstro) return alert("Apenas 1 monstro por turno!");
 
-        document.getElementById("resultadoCartaImg").src = novaCarta.imagem;
-        document.getElementById("resultadoCartaInfo").innerHTML =
-            `<b>${novaCarta.nome}</b> — ATK ${novaCarta.ataque} / DEF ${novaCarta.defesa}`;
-        document.getElementById("resultadoCartaBox").style.display = "flex";
+        // --- LÓGICA DE SACRIFÍCIO ---
+        if (carta.sacrifio > 0) {
+            let monstrosNoCampo = monstrosJogador.map((m, i) => m ? {i, nome: m.nome, bloqueado: m.bloqueado} : null).filter(Boolean);
+            if (monstrosNoCampo.length < carta.sacrifio) {
+                return alert(`Você precisa de ${carta.sacrifio} monstros no campo para sacrificar e invocar esta carta!`);
+            }
 
-        let extra = "";
-        let nivel = parseInt(localStorage.getItem(`nivel_${usuario}`)) || 1;
-        if (vitorias >= 5 && nivel < 2) {
-            nivel = 2;
-            localStorage.setItem(`nivel_${usuario}`, nivel);
-            let moedas = parseInt(localStorage.getItem(`moedas_${usuario}`)) || 0;
-            moedas += 300000;
-            localStorage.setItem(`moedas_${usuario}`, moedas);
-            extra = `<div class="resultado-nivel">NÍVEL 2 DESBLOQUEADO! +300000 moedas</div>`;
+            mostrarSelecao("PRIMEIRO SACRIFÍCIO", monstrosNoCampo.map(m => m.nome), (sel1) => {
+                const idx1 = monstrosNoCampo[sel1].i;
+                const m1 = monstrosJogador[idx1];
+                
+                // --- REMOVER BLOQUEIO SE O PRIMEIRO SACRIFICADO ESTIVER BLOQUEADO ---
+                if (m1.bloqueado) {
+                    const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idx1 && e.imagem.includes("bloqueio.jpg"));
+                    if (idxEsp !== -1) {
+                        cemiterioOponente.push(especiaisOponente[idxEsp]);
+                        especiaisOponente[idxEsp] = null;
+                    }
+                }
+
+                // Filtra para o segundo sacrifício (não pode ser o mesmo)
+                let restantes = monstrosNoCampo.filter(m => m.i !== idx1);
+                
+                mostrarSelecao("SEGUNDO SACRIFÍCIO", restantes.map(m => m.nome), (sel2) => {
+                    const idx2 = restantes[sel2].i;
+                    const m2 = monstrosJogador[idx2];
+
+                    // --- REMOVER BLOQUEIO SE O SEGUNDO SACRIFICADO ESTIVER BLOQUEADO ---
+                    if (m2.bloqueado) {
+                        const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idx2 && e.imagem.includes("bloqueio.jpg"));
+                        if (idxEsp !== -1) {
+                            cemiterioOponente.push(especiaisOponente[idxEsp]);
+                            especiaisOponente[idxEsp] = null;
+                        }
+                    }
+
+                    // Envia os dois para o cemitério
+                    cemiterioJogador.push(m1);
+                    cemiterioJogador.push(m2);
+                    monstrosJogador[idx1] = null;
+                    monstrosJogador[idx2] = null;
+
+                    // Som de sacrifício após escolher os dois
+                    tocarSom("efeitosonoros/sacrificio.ogg");
+
+                    // Invoca a carta de sacrifício
+                    mostrarSelecao("MODO DE INVOCAÇÃO", ["ATAQUE", "DEFESA"], (selModo) => {
+                        const modo = selModo === 0 ? "ataque" : "defesa";
+                        const slot = monstrosJogador.findIndex(s => s === null);
+                        if (slot !== -1) {
+                            monstrosJogador[slot] = { ...carta, modo: modo, revelada: (modo === "ataque"), jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                            tocarSom("efeitosonoros/carta.ogg");
+                            minhaMao.splice(idx, 1);
+                            jaInvocouMonstro = true;
+                            logBatalha(`Invocação Especial por Sacrifício: ${carta.nome}!`, "info");
+                            atualizarTela();
+                        }
+                    });
+                });
+            });
+            return; // Interrompe o fluxo normal
         }
 
-        document.getElementById("resultadoMensagem").innerHTML =
-            `Vitória ${vitorias} registrada!${extra}`;
-
-        document.getElementById("modalResultado").style.display = "flex";
-    }
-}
-
-function sortearCartaRecompensa() {
-    const nivel = parseInt(localStorage.getItem(`nivel_${usuario}`)) || 1;
-    const pool = [];
-
-    if (nivel >= 2) {
-        // === POOL NÍVEL 2 ===
-        pool.push({ nome: "Guerreiro",  imagem: "imagens/guerreiros/guerreiro1.jpg", atk: 800,  def: 600,  nivel: 1 }); // 100%
-        if (Math.random() < 0.55) pool.push({ nome: "Orc",      imagem: "imagens/orcs/orc1.jpg",          atk: 900,  def: 700,  nivel: 1 });
-        if (Math.random() < 0.55) pool.push({ nome: "Troll",    imagem: "imagens/trolls/troll1.jpg",      atk: 1000, def: 800,  nivel: 1 });
-        if (Math.random() < 0.55) pool.push({ nome: "Gigante",  imagem: "imagens/gigantes/gigante1.jpg",  atk: 1050, def: 800,  nivel: 1 });
-        if (Math.random() < 0.55) pool.push({ nome: "Morte",    imagem: "imagens/mortes/morte1.jpg",      atk: 1300, def: 1100, nivel: 1 });
-        if (Math.random() < 0.55) pool.push({ nome: "Guerreiro 2", imagem: "imagens/guerreiros/guerreiro2.jpg", atk: 1400, def: 1100, nivel: 2 });
-        if (Math.random() < 0.25) pool.push({ nome: "Orc 2",    imagem: "imagens/orcs/orc2.jpg",          atk: 1450, def: 1150, nivel: 2 });
-        if (Math.random() < 0.15) pool.push({ nome: "Troll 2",  imagem: "imagens/trolls/troll2.jpg",      atk: 1500, def: 1200, nivel: 2 });
-        if (Math.random() < 0.05) pool.push({ nome: "Gigante 2",imagem: "imagens/gigantes/gigante2.jpg",  atk: 1600, def: 1300, nivel: 2 });
-        if (Math.random() < 0.02) pool.push({ nome: "Morte 2",  imagem: "imagens/mortes/morte2.jpg",      atk: 1800, def: 1400, nivel: 2 });
+        // Invocação Normal
+        mostrarSelecao("INVOCAR", ["ATAQUE", "DEFESA"], (sel) => {
+            const modo = sel === 0 ? "ataque" : "defesa";
+            const slot = monstrosJogador.findIndex(s => s === null);
+            if (slot !== -1) {
+                monstrosJogador[slot] = { ...carta, modo: modo, revelada: (modo === "ataque"), jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                tocarSom("efeitosonoros/carta.ogg");
+                minhaMao.splice(idx, 1);
+                jaInvocouMonstro = true;
+                atualizarTela();
+            }
+        });
     } else {
-        // === POOL NÍVEL 1 ===
-        pool.push({ nome: "Guerreiro", imagem: "imagens/guerreiros/guerreiro1.jpg", atk: 800,  def: 600 }); // 100%
-        if (Math.random() < 0.30) pool.push({ nome: "Orc",     imagem: "imagens/orcs/orc1.jpg",     atk: 900,  def: 700 });
-        if (Math.random() < 0.30) pool.push({ nome: "Troll",   imagem: "imagens/trolls/troll1.jpg", atk: 1000, def: 800 });
-        if (Math.random() < 0.30) pool.push({ nome: "Gigante", imagem: "imagens/gigantes/gigante1.jpg", atk: 1050, def: 800 });
-        if (Math.random() < 0.30) pool.push({ nome: "Morte",   imagem: "imagens/mortes/morte1.jpg",   atk: 1300, def: 1100 });
+        mostrarSelecao("ESPECIAL", ["USAR AGORA", "COLOCAR NO CAMPO"], (sel) => {
+            if (sel === 0) {
+                const carta = minhaMao[idx];
+                tocarSom("efeitosonoros/carta.ogg");
+                ativarEfeitoEspecial(carta, () => minhaMao.splice(idx, 1));
+            }
+            else {
+                const s = especiaisJogador.findIndex(x => x === null);
+                if (s !== -1) { 
+                    especiaisJogador[s] = { ...minhaMao[idx], revelada: false }; 
+                    tocarSom("efeitosonoros/carta.ogg");
+                    minhaMao.splice(idx, 1); 
+                }
+                atualizarTela();
+            }
+        });
     }
-
-    const carta = pool[Math.floor(Math.random() * pool.length)];
-    return {
-        nome: carta.nome,
-        imagem: carta.imagem,
-        tipo: "monstro",
-        ataque: carta.atk,
-        defesa: carta.def,
-        nivel: carta.nivel || 1
-    };
 }
 
-function jogadorPodeAgir() {
-    // Pode comprar carta
-    if (!jaComprou && meuDeck.length > 0) return true;
-
-    // Pode invocar monstro da mão
-    if (!jaInvocouMonstro
-        && minhaMao.some(c => c.tipo === "monstro")
-        && monstrosJogador.some(s => s === null)) return true;
-
-    // Tem carta especial na mão para usar ou baixar
-    if (minhaMao.some(c => c.tipo === "especial")) return true;
-
-    // Pode atacar com algum monstro em ATK
-    if (!primeiroTurnoDoJogo && monstrosJogador.some(m =>
-        m && m.modo === "ataque" && !m.jaAtacou && (m.bloqueadoPor || 0) === 0
-    )) return true;
-
-    return false;
-    // Nota: mudar posição e ativar especial do campo são ações OPCIONAIS —
-    // não bloqueiam o auto-pass. O jogador as usa antes do timer disparar.
+function ativarEfeitoEspecialCampo(idx) {
+    const esp = especiaisJogador[idx];
+    ativarEfeitoEspecial(esp, () => {
+        if (!esp.imagem.toLowerCase().includes("bloqueio.jpg")) {
+            cemiterioJogador.push(especiaisJogador[idx]);
+            especiaisJogador[idx] = null;
+        }
+    });
 }
 
-function ataqueDireto() {
-    if (turnoAtual !== "VOCÊ" || atacanteSelecionadoIdx === null) return;
-    if (primeiroTurnoDoJogo) return alert("Não pode atacar no turno 1!");
-    const atk = monstrosJogador[atacanteSelecionadoIdx];
-    vidaOponente -= atk.ataque;
-    addLog(`<b>${atk.nome}</b> ataca direto! Máquina perde ${atk.ataque} LP.`, "dano");
-    atk.jaAtacou = true;
-    atacanteSelecionadoIdx = null;
-    verificarFimDeJogo();
+// --- FUNÇÃO PARA ANIMAÇÃO DE ATIVAÇÃO DE CARTA ---
+function animarAtivacaoCarta(carta, callback) {
+    const overlay = document.createElement("div");
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:20000; pointer-events:none;";
+    
+    const img = document.createElement("img");
+    img.src = carta.imagem;
+    img.style = "width:200px; height:280px; border:4px solid gold; border-radius:10px; box-shadow:0 0 50px gold; transform:scale(0); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);";
+    
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
+    
+    // Força reflow
+    void img.offsetWidth;
+    
+    // Inicia zoom in
+    img.style.transform = "scale(1.2)";
+    tocarSom("efeitosonoros/carta.ogg");
+    
+    setTimeout(() => {
+        // Zoom out e some
+        img.style.transition = "transform 0.3s ease-in, opacity 0.3s ease-in";
+        img.style.transform = "scale(2)";
+        img.style.opacity = "0";
+        
+        setTimeout(() => {
+            if (overlay.parentNode) document.body.removeChild(overlay);
+            if (callback) callback();
+        }, 300);
+    }, 1000);
+}
+
+function ativarEfeitoEspecial(cartaParaUsar, callbackRemover) {
+    animarAtivacaoCarta(cartaParaUsar, () => {
+        executarAtivacaoEspecial(cartaParaUsar, callbackRemover);
+    });
+}
+
+function executarAtivacaoEspecial(cartaParaUsar, callbackRemover) {
+    const img = cartaParaUsar.imagem.toLowerCase();
+
+    // LÓGICA DE TRANSFORMAÇÃO EM ROBÔ (EQUIPAR)
+    if (img.includes("equipar.jpg")) {
+        let alvos = monstrosJogador.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Sem monstros no campo para equipar!");
+        const opcoes = [
+            { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800, nivelReq: 1 },
+            { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000, nivelReq: 2 },
+            { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200, nivelReq: 3 },
+            { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500, nivelReq: 4 },
+            { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800, nivelReq: 5 }
+        ].filter(r => nivelAtual >= r.nivelReq);
+        if (opcoes.length === 0) return alert("Nenhum robô disponível no seu nível.");
+        mostrarSelecao("ESCOLHA O MONSTRO", alvos.map(a => a.nome), (selMon) => {
+            const mIdx = alvos[selMon].i;
+            mostrarSelecao("ESCOLHA O ROBÔ", opcoes.map(o => o.nome), (selRobo) => {
+                const r = opcoes[selRobo];
+                
+                // Som de equipar só depois de escolher o robô/monstro
+                tocarSom("efeitosonoros/equipar.ogg");
+
+                monstrosJogador[mIdx].imagem = r.imagem;
+                monstrosJogador[mIdx].nome = r.nome;
+                monstrosJogador[mIdx].ataque = r.ataque;
+                monstrosJogador[mIdx].defesa = r.defesa;
+                const removida = callbackRemover();
+                if (removida) cemiterioJogador.push(removida);
+                logBatalha(`Transformação em ${r.nome}`, "info");
+                atualizarTela();
+            });
+        });
+    } else if (img.includes("powerup")) {
+        let alvos = monstrosJogador.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Sem monstros no campo!");
+        mostrarSelecao("POWERUP (+300 ATK/DEF)", alvos.map(a => a.nome), (sel) => {
+            const mIdx = alvos[sel].i;
+
+            // Som de powerup só depois de escolher o alvo
+            tocarSom("efeitosonoros/powerup.ogg");
+
+            monstrosJogador[mIdx].ataque += 300; 
+            monstrosJogador[mIdx].defesa += 300;
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            logBatalha(`PowerUp em ${monstrosJogador[mIdx].nome}`, "info");
+            atualizarTela();
+        });
+    } else if (img.includes("powerdown")) {
+        let alvos = monstrosOponente.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Oponente sem monstros!");
+        mostrarSelecao("POWERDOWN (-300 ATK/DEF)", alvos.map(a => a.nome), (sel) => {
+            const mIdx = alvos[sel].i;
+
+            // Som de powerdown só depois de escolher o alvo
+            tocarSom("efeitosonoros/powerdown.ogg");
+
+            monstrosOponente[mIdx].ataque = Math.max(0, monstrosOponente[mIdx].ataque - 300); 
+            monstrosOponente[mIdx].defesa = Math.max(0, monstrosOponente[mIdx].defesa - 300);
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            logBatalha(`PowerDown em ${monstrosOponente[mIdx].nome}`, "dano");
+            atualizarTela();
+        });
+    } else if (img.includes("bloqueio.jpg")) {
+        let alvos = monstrosOponente.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Oponente sem monstros para bloquear!");
+        mostrarSelecao("BLOQUEAR MONSTRO (3 TURNOS)", alvos.map(a => a.nome), (sel) => {
+            const mIdx = alvos[sel].i;
+            
+            // Ativa o bloqueio no monstro
+            monstrosOponente[mIdx].bloqueado = true;
+            monstrosOponente[mIdx].turnosBloqueio = 3;
+            
+            // Remove da origem (mão ou campo)
+            const removida = callbackRemover(); 
+            
+            // Encontra slot especial se veio da mão
+            if (removida && !removida.vinculo) {
+                const slotEsp = especiaisJogador.findIndex(s => s === null);
+                if (slotEsp === -1) {
+                    // Se não tiver slot, cancela ou bota no cemitério? 
+                    // Pelas regras, ele fica no campo. Se não tem slot, não pode usar.
+                    // Já verificamos slot no fluxo anterior mas aqui é mais seguro.
+                    return alert("Sem slots de especiais vazios!");
+                }
+                especiaisJogador[slotEsp] = { 
+                    ...removida, 
+                    revelada: true, 
+                    vinculo: mIdx, 
+                    turnosRestantes: 3 
+                };
+            } else {
+                // Se já estava no campo, apenas atualiza
+                cartaParaUsar.revelada = true;
+                cartaParaUsar.vinculo = mIdx;
+                cartaParaUsar.turnosRestantes = 3;
+            }
+            
+            logBatalha(`Bloqueio ativado em ${monstrosOponente[mIdx].nome}`, "info");
+            atualizarTela();
+        });
+    } else if (img.includes("chamado.jpg")) {
+        let alvos = monstrosOponente.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Oponente sem monstros para o chamado!");
+        mostrarSelecao("ENVIAR AO CEMITÉRIO", alvos.map(a => a.nome), (sel) => {
+            const mIdx = alvos[sel].i;
+            const alvo = monstrosOponente[mIdx];
+            
+            // --- REMOVER BLOQUEIO SE O ALVO SAIR DO CAMPO POR CHAMADO ---
+            if (alvo.bloqueado) {
+                const idxEsp = especiaisJogador.findIndex(e => e && e.vinculo === mIdx && e.imagem.includes("bloqueio.jpg"));
+                if (idxEsp !== -1) {
+                    cemiterioJogador.push(especiaisJogador[idxEsp]);
+                    especiaisJogador[idxEsp] = null;
+                }
+            }
+
+            logBatalha(`${alvo.nome} foi enviado ao cemitério!`, "info");
+            cemiterioOponente.push(alvo);
+            monstrosOponente[mIdx] = null;
+            
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            
+            atualizarTela();
+        });
+    } else if (img.includes("vida.jpg")) {
+        tocarSom("efeitosonoros/vida.ogg");
+        alterarVida("jogador", vidaJogador + 500);
+        logBatalha(`Você recuperou 500 LP!`, "cura");
+        callbackRemover(); // Executa o callback para remover da mão/campo
+        atualizarTela();
+    } else if (img.includes("fusao.jpg")) {
+        let monstrosNoCampo = monstrosJogador.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        let monstrosNaMao = minhaMao.filter(c => c.tipo === "monstro" && c !== cartaParaUsar);
+        
+        if (monstrosNoCampo.length === 0 || monstrosNaMao.length === 0) {
+            return alert("Você precisa de 1 monstro no campo e 1 na mão para a fusão!");
+        }
+
+        mostrarSelecao("MONSTRO DO CAMPO", monstrosNoCampo.map(m => m.nome), (selCampo) => {
+            const mCampoIdx = monstrosNoCampo[selCampo].i;
+            mostrarSelecao("MONSTRO DA MÃO", monstrosNaMao.map(m => m.nome), (selMao) => {
+                const mMaoObj = monstrosNaMao[selMao];
+                const mMaoIdx = minhaMao.indexOf(mMaoObj);
+
+                tocarSom("efeitosonoros/fusao.ogg");
+                // ... (lógica de mutante) ...
+                let mutante;
+                if (nivelAtual <= 5) {
+                    mutante = { nome: "Mutante 1", imagem: "imagens/mutantes/mutante1.jpg", ataque: 2500, defesa: 2000, tipo: "monstro" };
+                } else if (nivelAtual <= 10) {
+                    mutante = { nome: "Mutante 2", imagem: "imagens/mutantes/mutante2.jpg", ataque: 3000, defesa: 2500, tipo: "monstro" };
+                } else {
+                    mutante = { nome: "Mutante 3", imagem: "imagens/mutantes/mutante3.jpg", ataque: 3500, defesa: 2900, tipo: "monstro" };
+                }
+
+                // Executa a fusão
+                cemiterioJogador.push(monstrosJogador[mCampoIdx]);
+                cemiterioJogador.push(minhaMao.splice(mMaoIdx, 1)[0]);
+                
+                monstrosJogador[mCampoIdx] = { ...mutante, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                tocarSom("efeitosonoros/carta.ogg");
+                
+                const removida = callbackRemover();
+                if (removida) cemiterioJogador.push(removida);
+                
+                logBatalha(`Fusão realizada: ${mutante.nome}!`, "info");
+                atualizarTela();
+            });
+        });
+    } else if (img.includes("trocal.jpg")) {
+        tocarSom("efeitosonoros/trocal.ogg");
+        let alvos = monstrosOponente.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
+        if (alvos.length === 0) return alert("Oponente sem monstros para roubar!");
+        
+        const slotLivre = monstrosJogador.findIndex(s => s === null);
+        if (slotLivre === -1) return alert("Você não tem espaço no campo para o monstro roubado!");
+
+        mostrarSelecao("ROUBAR MONSTRO (2 TURNOS)", alvos.map(a => a.nome), (sel) => {
+            const mIdxOponente = alvos[sel].i;
+            const monstroRoubado = monstrosOponente[mIdxOponente];
+            
+            // --- REMOVER BLOQUEIO SE O ALVO FOR ROUBADO ---
+            if (monstroRoubado.bloqueado) {
+                const idxEsp = especiaisJogador.findIndex(e => e && e.vinculo === mIdxOponente && e.imagem.includes("bloqueio.jpg"));
+                if (idxEsp !== -1) {
+                    cemiterioJogador.push(especiaisJogador[idxEsp]);
+                    especiaisJogador[idxEsp] = null;
+                }
+            }
+
+            // Transfere o monstro
+            monstrosJogador[slotLivre] = { 
+                ...monstroRoubado, 
+                roubado: true, 
+                turnosRoubo: 2, 
+                donoOriginal: "oponente",
+                revelada: true,
+                jaAtacou: false,
+                bloqueado: false // Limpa bloqueio ao mudar de lado
+            };
+            tocarSom("efeitosonoros/carta.ogg");
+            monstrosOponente[mIdxOponente] = null;
+
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            
+            logBatalha(`Você roubou ${monstroRoubado.nome}!`, "info");
+            atualizarTela();
+        });
+    } else if (img.includes("despertar.jpg")) {
+        let todosCemiterio = [...cemiterioJogador, ...cemiterioOponente];
+        let monstrosNoCemiterio = todosCemiterio.filter(c => c.tipo === "monstro");
+        if (monstrosNoCemiterio.length === 0) return alert("Nenhum monstro no cemitério!");
+        
+        mostrarSelecao("DESPERTAR MONSTRO", monstrosNoCemiterio.map(m => m.nome), (sel) => {
+            const mGanhado = monstrosNoCemiterio[sel];
+            let idxJ = cemiterioJogador.indexOf(mGanhado);
+            if (idxJ !== -1) cemiterioJogador.splice(idxJ, 1);
+            else {
+                let idxO = cemiterioOponente.indexOf(mGanhado);
+                if (idxO !== -1) cemiterioOponente.splice(idxO, 1);
+            }
+            
+            if (minhaMao.length >= 5) escolherDescarte(mGanhado);
+            else minhaMao.push(mGanhado);
+            
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            logBatalha(`${mGanhado.nome} despertou do cemitério!`, "info");
+            atualizarTela();
+        });
+    }
+}
+
+function passarTurno() {
+    if (turnoAtual !== "VOCÊ") return;
+    
+    totalTurnosPartida++; // Incrementa turno
+    
+    // --- ATUALIZA EFEITOS NO FIM DO TURNO DO JOGADOR ---
+    especiaisJogador.forEach((esp, i) => {
+        if (esp && esp.imagem.includes("bloqueio.jpg")) {
+            esp.turnosRestantes--;
+            const alvoIdx = esp.vinculo;
+            // Se o tempo acabou ou o monstro oponente no slot sumiu
+            if (esp.turnosRestantes <= 0 || !monstrosOponente[alvoIdx]) {
+                if (monstrosOponente[alvoIdx]) {
+                    monstrosOponente[alvoIdx].bloqueado = false;
+                    monstrosOponente[alvoIdx].turnosBloqueio = 0;
+                }
+                cemiterioJogador.push(especiaisJogador[i]);
+                especiaisJogador[i] = null;
+                logBatalha("O efeito de Bloqueio acabou e a carta foi para o cemitério.", "info");
+            }
+        }
+    });
+
+    // Controle de monstros roubados (Trocal)
+    monstrosJogador.forEach((m, i) => {
+        if (m && m.roubado) {
+            m.turnosRoubo--;
+            if (m.turnosRoubo <= 0) {
+                logBatalha(`${m.nome} voltou para o dono original e foi ao cemitério.`, "info");
+                cemiterioOponente.push(monstrosJogador[i]);
+                monstrosJogador[i] = null;
+            }
+        }
+    });
+
+    turnoAtual = "MÁQUINA";
+    jaComprouCarta = false; jaInvocouMonstro = false; primeiroTurnoDoJogo = false;
+    monstrosOponente.forEach(m => { if(m) { m.jaAtacou = false; m.acabouDeSerInvocado = false; m.mudouPosicaoNesteTurno = false; } });
+    document.getElementById("turnoAviso").innerText = "TURNO: MÁQUINA";
     atualizarTela();
+    setTimeout(turnoDaMaquina, 1500);
 }
 
-function fecharModal() {
-    document.getElementById("modalPosicao").style.display = "none";
-    callbackSelecao = null;
+// --- ADICIONAR LÓGICA DE FIM DE TURNO DA MÁQUINA TAMBÉM ---
+function finalizarTurnoMaquina() {
+    especiaisOponente.forEach((esp, i) => {
+        if (esp && esp.imagem.includes("bloqueio.jpg")) {
+            esp.turnosRestantes--;
+            const alvoIdx = esp.vinculo;
+            if (esp.turnosRestantes <= 0 || !monstrosJogador[alvoIdx]) {
+                if (monstrosJogador[alvoIdx]) {
+                    monstrosJogador[alvoIdx].bloqueado = false;
+                    monstrosJogador[alvoIdx].turnosBloqueio = 0;
+                }
+                cemiterioOponente.push(especiaisOponente[i]);
+                especiaisOponente[i] = null;
+                logBatalha("O bloqueio da Máquina acabou.", "info");
+            }
+        }
+    });
+
+    turnoAtual = "VOCÊ"; 
+    jaComprouCarta = false; jaInvocouMonstro = false;
+    monstrosJogador.forEach(m => { if(m) { m.jaAtacou = false; m.acabouDeSerInvocado = false; m.mudouPosicaoNesteTurno = false; } });
+    document.getElementById("turnoAviso").innerText = "TURNO: VOCÊ";
+    atualizarTela();
+    verificarFimJogo();
 }
+
+/* === NARRADOR SOMBRIO === */
+function mostrarNarrador(texto, callback) {
+    const overlay = document.createElement("div");
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle, rgba(20,0,0,0.9) 0%, rgba(0,0,0,1) 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:30000;";
+    
+    const container = document.createElement("div");
+    container.style = "position:relative; display:flex; flex-direction:column; align-items:center; width:90%; max-width:500px;";
+
+    // Balão de conversa
+    const balao = document.createElement("div");
+    balao.style = "background:white; border:3px solid #333; border-radius:20px; padding:15px 20px; margin-bottom:20px; position:relative; box-shadow:0 0 20px rgba(255,255,255,0.2); width:100%; text-align:center; font-family:'Cinzel', serif; font-weight:bold; color:#111; font-size:18px;";
+    balao.innerHTML = texto;
+    
+    // Triângulo do balão
+    const seta = document.createElement("div");
+    seta.style = "position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:15px solid transparent; border-right:15px solid transparent; border-top:15px solid white;";
+    balao.appendChild(seta);
+
+    // Imagem do narrador
+    const img = document.createElement("img");
+    img.src = "imagens/ceifeiro.gif";
+    img.style = "width:250px; height:250px; border-radius:50%; border:5px solid #3d2b1f; box-shadow:0 0 40px rgba(255,0,0,0.3); filter: brightness(0.8) contrast(1.2);";
+    
+    const btnProsseguir = document.createElement("button");
+    btnProsseguir.innerText = "PROSSEGUIR...";
+    btnProsseguir.style = "margin-top:30px; padding:12px 30px; background:#3d2b1f; color:gold; border:2px solid gold; border-radius:5px; font-family:'Cinzel', serif; font-weight:bold; cursor:pointer; letter-spacing:2px; transition:0.3s;";
+    btnProsseguir.onmouseover = () => btnProsseguir.style.background = "#5a3d2b";
+    btnProsseguir.onmouseout = () => btnProsseguir.style.background = "#3d2b1f";
+    
+    btnProsseguir.onclick = () => {
+        document.body.removeChild(overlay);
+        if (callback) callback();
+    };
+
+    container.appendChild(balao);
+    container.appendChild(img);
+    container.appendChild(btnProsseguir);
+    overlay.appendChild(container);
+    document.body.appendChild(overlay);
+}
+
+function mostrarDerrota() {
+    const falasDerrota = [
+        "Fraco... você precisa melhorar muito suas habilidades se quiser me enfrentar.",
+        "É apenas isso que você tem? Que decepção...",
+        "Volte para o treinamento. Você não está pronto para a verdadeira arena."
+    ];
+    const fala = falasDerrota[Math.floor(Math.random() * falasDerrota.length)];
+    
+    mostrarNarrador(fala, () => {
+        const overlay = document.createElement("div");
+        overlay.style.position = "fixed";
+        overlay.style.left = "0";
+        overlay.style.top = "0";
+        overlay.style.right = "0";
+        overlay.style.bottom = "0";
+        overlay.style.background = "rgba(0,0,0,0.85)";
+        overlay.style.zIndex = "3000";
+        overlay.style.display = "flex";
+        overlay.style.flexDirection = "column";
+        overlay.style.alignItems = "center";
+        overlay.style.justifyContent = "center";
+        const box = document.createElement("div");
+        box.style.background = "#c2a679";
+        box.style.border = "4px solid #3d2b1f";
+        box.style.padding = "20px";
+        box.style.borderRadius = "8px";
+        box.style.textAlign = "center";
+        box.style.width = "90%";
+        box.style.maxWidth = "360px";
+        const h = document.createElement("div");
+        h.innerText = "VOCÊ PERDEU";
+        h.style.fontSize = "22px";
+        h.style.fontWeight = "900";
+        h.style.marginBottom = "10px";
+        const p = document.createElement("div");
+        p.innerText = "Tentar novamente?";
+        p.style.marginBottom = "15px";
+        const btn = document.createElement("button");
+        btn.innerText = "JOGAR NOVAMENTE";
+        btn.style.padding = "10px 16px";
+        btn.style.fontWeight = "bold";
+        btn.style.cursor = "pointer";
+        btn.onclick = () => location.reload();
+        box.appendChild(h);
+        box.appendChild(p);
+        box.appendChild(btn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+    });
+}
+
+function mostrarSelecao(tit, ops, cb) {
+    document.getElementById("textoModal").innerText = tit;
+    const box = document.getElementById("botoesAcao");
+    box.innerHTML = "";
+    ops.forEach((o, i) => {
+        const b = document.createElement("button");
+        b.innerText = o; b.onclick = () => { fecharModal(); cb(i); };
+        box.appendChild(b);
+    });
+    document.getElementById("modalPosicao").style.display = "flex";
+}
+
+function fecharModal() { document.getElementById("modalPosicao").style.display = "none"; }
+
+function logBatalha(m, t) {
+    const l = document.getElementById("logConteudo");
+    if (!l) return;
+    const d = document.createElement("div");
+    d.className = "log-item " + t; d.innerText = m;
+    l.prepend(d);
+}
+
+function toggleLog() {
+    const conteudo = document.getElementById("logConteudo");
+    const icon = document.getElementById("logToggleIcon");
+    if (!conteudo || !icon) return;
+    const aberto = conteudo.style.display !== "none";
+    conteudo.style.display = aberto ? "none" : "block";
+    icon.textContent = aberto ? "▲" : "▼";
+}
+
+window.onload = () => { 
+    document.getElementById("nomeUser").innerText = usuario; 
+    atualizarTela();
+    
+    // Inicia com o Narrador intimidando antes da roleta
+    const falasIniciais = [
+        "Bem-vindo à minha arena... espero que esteja pronto para ser humilhado.",
+        "Mais um duelista patético tentando a sorte? Veremos quanto tempo dura.",
+        "O medo no seu olhar é divertido... vamos ver se suas cartas são melhores que sua coragem."
+    ];
+    const fala = falasIniciais[Math.floor(Math.random() * falasIniciais.length)];
+    
+    mostrarNarrador(fala, () => {
+        document.getElementById("modalRoleta").style.display = "flex";
+    });
+};

@@ -1,9 +1,11 @@
-function fazerLogin() {
+async function fazerLogin() {
     const input = document.getElementById("username");
     const inputEmail = document.getElementById("email");
     const inputSenha = document.getElementById("senha");
+
+    // Mantemos o nome e senha como digitados, apenas o email vai para minúsculo
     const nome = input.value.trim();
-    const email = (inputEmail && inputEmail.value.trim()) || "";
+    const email = (inputEmail && inputEmail.value.trim().toLowerCase()) || "";
     const senha = (inputSenha && inputSenha.value.trim()) || "";
 
     if (nome === "") {
@@ -12,38 +14,112 @@ function fazerLogin() {
         return;
     }
 
-    localStorage.setItem("usuarioLogado", nome);
-    if (email) localStorage.setItem(`email_${nome}`, email);
-    if (senha) localStorage.setItem(`senha_${nome}`, senha);
-
-    // Se o jogador não tiver deck, cria o inicial com os novos status
-    if (!localStorage.getItem(`deck_${nome}`)) {
-        const deckInicial = [];
-        function criarMonstro(nomeCarta, imagem, atk, def) {
-            return { nome: nomeCarta, imagem, tipo: "monstro", ataque: atk, defesa: def, nivel: 1 };
-        }
-        function criarEspecial(nomeCarta, imagem, efeito) {
-            return { nome: nomeCarta, imagem, tipo: "especial", efeito };
-        }
-        for (let i = 0; i < 8; i++) deckInicial.push(criarMonstro("Guerreiro", "imagens/guerreiros/guerreiro1.jpg", 800, 600));
-        for (let i = 0; i < 3; i++) deckInicial.push(criarMonstro("Orc", "imagens/orcs/orc1.jpg", 900, 700));
-        // Deck inicial: 24 cartas conforme especificação
-        // 8 Guerreiro1, 3 Orc1, 3 Troll1, 3 Gigante1, 3 Morte1, 2 PowerUp, 2 PowerDown
-        for (let i = 0; i < 3; i++) deckInicial.push(criarMonstro("Troll", "imagens/trolls/troll1.jpg", 1000, 800));
-        for (let i = 0; i < 3; i++) deckInicial.push(criarMonstro("Gigante", "imagens/gigantes/gigante1.jpg", 1050, 800));
-        for (let i = 0; i < 3; i++) deckInicial.push(criarMonstro("Morte", "imagens/mortes/morte1.jpg", 1300, 1100));
-        for (let i = 0; i < 2; i++) deckInicial.push(criarEspecial("+ Forte", "imagens/especiais/powerup.jpg", "aumenta500"));
-        for (let i = 0; i < 2; i++) deckInicial.push(criarEspecial("- Força", "imagens/especiais/powerdown.jpg", "diminui500"));
-
-        localStorage.setItem(`deck_${nome}`, JSON.stringify(deckInicial));
-        localStorage.setItem(`deck_inventory_${nome}`, JSON.stringify(deckInicial));
-        localStorage.setItem(`deck_build_${nome}`, JSON.stringify(deckInicial));
-        localStorage.setItem(`moedas_${nome}`, "0");
-        localStorage.setItem(`nivel_${nome}`, "1");
-        localStorage.setItem(`vitorias_${nome}`, "0");
+    // Validação de Email Real e Obrigatório
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email === "") {
+        alert("Para sua segurança, informe um email para receber suas credenciais!");
+        inputEmail.focus();
+        return;
+    }
+    if (!emailRegex.test(email)) {
+        alert("O pergaminho de email parece inválido! Por favor, digite um email real.");
+        inputEmail.focus();
+        return;
     }
 
-    window.location.href = "deck.html";
+    // Validação de Senha Obrigatória
+    if (senha === "") {
+        alert("Nobre guerreiro, você precisa de uma senha para proteger suas cartas!");
+        inputSenha.focus();
+        return;
+    }
+
+    localStorage.setItem("usuarioLogado", nome);
+    localStorage.setItem(`email_${nome}`, email);
+    localStorage.setItem(`senha_${nome}`, senha);
+
+    // Exibe um aviso visual de que o e-mail está sendo enviado
+    const btn = document.querySelector(".btn-entrar");
+    const textoOriginal = btn.innerText;
+    btn.innerText = "ENVIANDO CREDENCIAIS...";
+    btn.disabled = true;
+
+    // Dispara o email via PHP sem travar o login (Fire and Forget)
+    console.log("Enviando credenciais para: " + email);
+    enviarCredenciaisPorEmail(nome, email, senha);
+
+    // Pequena pausa apenas para dar feedback visual, mas sem depender da resposta do PHP
+    setTimeout(() => {
+        // Se o jogador não tiver deck...
+        if (!localStorage.getItem(`deck_${nome}`)) {
+            const deckInicial = [];
+            function criarMonstro(nomeCarta, imagem, atk, def) {
+                return { nome: nomeCarta, imagem: imagem, tipo: "monstro", ataque: atk, defesa: def, nivel: 1 };
+            }
+            function criarEspecial(nomeCarta, imagem, efeito) {
+                return { nome: nomeCarta, imagem: imagem, tipo: "especial", efeito: efeito };
+            }
+
+        // Deck inicial: 28 cartas
+        // 7x Planta 1, 5x Inseto 1, 5x Guerreiro 1, 5x Orc 1, 2x Vida, 2x PowerUp, 2x Equipar
+        for (let i = 0; i < 7; i++) deckInicial.push(criarMonstro("Planta 1", "imagens/plantas/planta1.jpg", 500, 400));
+        for (let i = 0; i < 5; i++) deckInicial.push(criarMonstro("Inseto 1", "imagens/insetos/inseto1.jpg", 600, 650));
+        for (let i = 0; i < 5; i++) deckInicial.push(criarMonstro("Guerreiro 1", "imagens/guerreiros/guerreiro1.jpg", 1050, 860));
+        for (let i = 0; i < 5; i++) deckInicial.push(criarMonstro("Orc 1", "imagens/orcs/orc1.jpg", 1200, 950));
+        
+        for (let i = 0; i < 2; i++) deckInicial.push(criarEspecial("Vida", "imagens/especiais/vida.jpg", "cura500"));
+        for (let i = 0; i < 2; i++) deckInicial.push(criarEspecial("Powerup", "imagens/especiais/powerup.jpg", "aumenta500"));
+        for (let i = 0; i < 2; i++) deckInicial.push(criarEspecial("Equipar", "imagens/especiais/equipar.jpg", "transformar"));
+
+            localStorage.setItem(`deck_${nome}`, JSON.stringify(deckInicial));
+            localStorage.setItem(`deck_inventory_${nome}`, JSON.stringify(deckInicial));
+            localStorage.setItem(`deck_build_${nome}`, JSON.stringify(deckInicial));
+            localStorage.setItem(`moedas_${nome}`, "0");
+            localStorage.setItem(`nivel_${nome}`, "1");
+            localStorage.setItem(`vitorias_${nome}`, "0");
+        }
+        window.location.href = "deck.html";
+    }, 800);
 }
 
-document.addEventListener('keypress', (e) => { if (e.key === 'Enter') fazerLogin(); });
+function enviarCredenciaisPorEmail(nome, email, senha) {
+    const formData = new FormData();
+    formData.append('nome', nome);
+    formData.append('email', email);
+    formData.append('senha', senha);
+
+    return fetch('enviar_email.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => {
+        console.log("Status do envio de email:", data);
+        return data;
+    })
+    .catch(error => {
+        console.error("Erro ao enviar email:", error);
+        throw error;
+    });
+}
+
+document.addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+        fazerLogin();
+    }
+});
+function salvarSeguro(chave, valor){
+    const texto = JSON.stringify(valor);
+    const codificado = btoa(texto); 
+    localStorage.setItem(chave, codificado);
+}
+
+function carregarSeguro(chave){
+    const dado = localStorage.getItem(chave);
+    if(!dado) return null;
+    try{
+        return JSON.parse(atob(dado));
+    }catch{
+        return null;
+    }
+}

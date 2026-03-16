@@ -1,0 +1,205 @@
+/* --- LOJA: EXTENSÃO DO DECK.CSS --- */
+
+/* Ajustes na Barra de Ferramentas da Loja */
+.deck-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 8px;
+    border-bottom: 2px solid var(--madeira);
+}
+
+.toolbar-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.toolbar-btn {
+    flex: 1;
+    min-width: 100px;
+    max-width: 150px;
+    padding: 10px;
+    font-size: 0.85rem;
+}
+
+.btn-back { background: #444 !important; }
+.btn-arena { background: #8b0000 !important; }
+
+/* Display de Stats - Mais Bonito */
+.stats-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    background: var(--madeira);
+    color: var(--ouro);
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: 2px solid var(--ouro);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    width: fit-content;
+    margin: 0 auto;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Filtros */
+.deck-filters {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.deck-filters label {
+    color: var(--madeira);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.deck-filters select {
+    padding: 8px;
+    border: 2px solid var(--madeira);
+    border-radius: 5px;
+    background: var(--papiro);
+    font-family: 'Cinzel', serif;
+}
+
+/* Título */
+.loja-title {
+    font-size: 2.2rem;
+    margin: 20px 0;
+    color: var(--madeira);
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.4);
+}
+
+/* Ajuste no Grid para a Loja */
+.deck-grid#lojaGrid {
+    height: 550px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.05);
+    padding: 20px;
+}
+
+/* Cards da Loja */
+.carta-deck.loja-card {
+    cursor: pointer;
+    height: 260px; /* Um pouco maior que o deck.html para caber o preço */
+}
+
+.card-price-tag {
+    margin-top: 8px;
+    background: var(--madeira);
+    color: var(--ouro);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    width: 90%;
+    text-align: center;
+    border: 1px solid var(--ouro);
+}
+
+/* Modal de Compra Estilo Pergaminho */
+.modal-compra {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: #c2a679;
+    border: 10px solid var(--madeira);
+    border-image: url('https://www.transparentpng.com/download/border/9O0Zz1-wooden-border-frame-transparent.png') 30 stretch;
+    padding: 30px;
+    border-radius: 5px;
+    text-align: center;
+    color: var(--madeira);
+    max-width: 320px;
+    width: 90%;
+    box-shadow: 0 0 50px rgba(0,0,0,0.9);
+}
+
+.modal-content h3 {
+    margin: 0 0 15px;
+    font-family: 'Cinzel', serif;
+    border-bottom: 2px double var(--madeira);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.btn-confirmar {
+    padding: 10px 18px;
+    background: linear-gradient(to bottom, #4a4a4a 0%, #1a1a1a 100%);
+    color: var(--ouro);
+    border: 2px solid var(--ouro);
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-cancelar {
+    padding: 10px 18px;
+    background: var(--sangue);
+    color: white;
+    border: 2px solid var(--madeira);
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-confirmar:hover {
+    background: var(--ouro);
+    color: #1a1a1a;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 600px) {
+    .loja-title { font-size: 1.6rem; }
+    
+    .stats-display {
+        font-size: 0.85rem;
+        padding: 8px 15px;
+        gap: 10px;
+    }
+    
+    .toolbar-btn {
+        min-width: 80px;
+        font-size: 0.75rem;
+        padding: 8px;
+    }
+    
+    .deck-grid#lojaGrid {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 10px;
+        height: 60vh;
+    }
+
+    .carta-deck.loja-card {
+        height: 240px;
+    }
+}

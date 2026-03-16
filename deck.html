@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Meu Deck - Mini Duel</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="deck.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="deck-container">
+        <div class="deck-toolbar">
+            <div class="toolbar-row">
+                <div class="toolbar-actions">
+                    <button class="toolbar-btn btn-back" onclick="window.location.href='index.html'">VOLTAR</button>
+                    <button class="toolbar-btn" onclick="window.location.href='mdeck.html'">MEU DECK</button>
+                    <button class="toolbar-btn btn-arena" onclick="window.location.href='logado.html'">ARENA ⚔️</button>
+                </div>
+                <div class="deck-filters">
+                    <input id="buscaCarta" type="text" placeholder="BUSCAR CARTA..." style="width: 220px;">
+                </div>
+            </div>
+
+            <div class="toolbar-stats-filters">
+                <div class="stats-display large-stats" id="statsJogador"></div>
+            </div>
+        </div>
+        <div class="deck-grid" id="listaCartas"></div>
+    </div>
+<script>
+const nome = localStorage.getItem("usuarioLogado");
+
+if (!nome) {
+    window.location.href = "index.html";
+}
+
+// Chaves sincronizadas com script.js
+let inventarioArena = JSON.parse(localStorage.getItem(`deck_inventory_${nome}`)) || [];
+
+// --- AJUSTE DE SEGURANÇA: SE O USUÁRIO NÃO TIVER AS CARTAS INICIAIS, RESET ---
+const temPlanta = inventarioArena.some(c => c.nome === "Planta 1");
+const temInseto = inventarioArena.some(c => c.nome === "Inseto 1");
+
+if (inventarioArena.length === 0 || !temPlanta || !temInseto) {
+    console.log("Deck incompleto detectado na vitrine. Resetando...");
+    inventarioArena = [];
+    const COMPOSICAO_INICIAL = [
+        { img: "imagens/plantas/planta1.jpg", n: "Planta 1", t: "monstro", a: 500, d: 400, q: 7 },
+        { img: "imagens/insetos/inseto1.jpg", n: "Inseto 1", t: "monstro", a: 600, d: 650, q: 5 },
+        { img: "imagens/guerreiros/guerreiro1.jpg", n: "Guerreiro 1", t: "monstro", a: 1050, d: 860, q: 5 },
+        { img: "imagens/orcs/orc1.jpg", n: "Orc 1", t: "monstro", a: 1200, d: 950, q: 5 },
+        { img: "imagens/especiais/vida.jpg", n: "Vida", t: "especial", a: 0, d: 0, q: 2 },
+        { img: "imagens/especiais/powerup.jpg", n: "Powerup", t: "especial", a: 0, d: 0, q: 2 },
+        { img: "imagens/especiais/equipar.jpg", n: "Equipar", t: "especial", a: 0, d: 0, q: 2 }
+    ];
+    COMPOSICAO_INICIAL.forEach(item => {
+        for (let i = 0; i < item.q; i++) {
+            inventarioArena.push({ nome: item.n, imagem: item.img, tipo: item.t, ataque: item.a, defesa: item.d });
+        }
+    });
+    localStorage.setItem(`deck_inventory_${nome}`, JSON.stringify(inventarioArena));
+    localStorage.removeItem(`deck_build_${nome}`);
+}
+let deckSalvo = JSON.parse(localStorage.getItem(`deck_build_${nome}`)) || [];
+let nivel = parseInt(localStorage.getItem(`nivel_${nome}`)) || 1;
+let moedas = parseInt(localStorage.getItem(`moedas_${nome}`)) || 0;
+
+function atualizarStats() {
+    const el = document.getElementById("statsJogador");
+    if (el) {
+        el.innerHTML = `
+            <div class="stat-item" title="Nível Atual">
+                <span>⭐</span> <span>${nivel}</span>
+            </div>
+            <div class="stat-item" title="Minhas Moedas">
+                <span>💰</span> <span>${moedas.toLocaleString()}</span>
+            </div>
+            <div class="stat-item" title="Total no Inventário">
+                <span>🎴</span> <span>${inventarioArena.length}</span>
+            </div>
+        `;
+    }
+}
+atualizarStats();
+
+// --- FUNÇÃO AUXILIAR PARA SONS ---
+function tocarSom(caminho) {
+    const audio = new Audio(caminho);
+    audio.play().catch(e => console.log("Erro ao tocar som:", e));
+}
+
+// --- SOM DE HOVER GLOBAL ---
+function configurarHoverSons() {
+    document.body.addEventListener("mouseover", (e) => {
+        const target = e.target.closest(".carta-deck, .toolbar-btn, .lock-msg");
+        if (target) {
+            tocarSom("efeitosonoros/carta.ogg");
+        }
+    });
+}
+configurarHoverSons();
+
+function monstro(nome, imagem, ataque, defesa) { return { nome, imagem, tipo: "monstro", ataque, defesa }; }
+function sacrificio(nome, imagem, ataque, defesa, sac) { return { nome, imagem, tipo: "monstro", ataque, defesa, sacrifio: sac }; }
+
+const catalogo = [
+    // NIVEL 1 - PLANTAS
+    monstro("Planta 1", "imagens/plantas/planta1.jpg", 500, 400),
+    monstro("Planta 2", "imagens/plantas/planta2.jpg", 600, 450),
+    monstro("Planta 3", "imagens/plantas/planta3.jpg", 700, 500),
+    monstro("Planta 4", "imagens/plantas/planta4.jpg", 800, 550),
+    monstro("Planta 5", "imagens/plantas/planta5.jpg", 900, 600),
+
+    // NIVEL 2 - INSETOS
+    monstro("Inseto 1", "imagens/insetos/inseto1.jpg", 600, 650),
+    monstro("Inseto 2", "imagens/insetos/inseto2.jpg", 750, 700),
+    monstro("Inseto 3", "imagens/insetos/inseto3.jpg", 850, 750),
+    monstro("Inseto 4", "imagens/insetos/inseto4.jpg", 900, 800),
+    monstro("Inseto 5", "imagens/insetos/inseto5.jpg", 1000, 850),
+
+    // NIVEL 3 - GUERREIROS
+    monstro("Guerreiro 1", "imagens/guerreiros/guerreiro1.jpg", 1050, 860),
+    monstro("Guerreiro 2", "imagens/guerreiros/guerreiro2.jpg", 1100, 870),
+    monstro("Guerreiro 3", "imagens/guerreiros/guerreiro3.jpg", 1150, 880),
+    monstro("Guerreiro 4", "imagens/guerreiros/guerreiro4.jpg", 1200, 890),
+    monstro("Guerreiro 5", "imagens/guerreiros/guerreiro5.jpg", 1250, 900),
+
+    // NIVEL 4 - ORCS
+    monstro("Orc 1", "imagens/orcs/orc1.jpg", 1200, 950),
+    monstro("Orc 2", "imagens/orcs/orc2.jpg", 1300, 960),
+    monstro("Orc 3", "imagens/orcs/orc3.jpg", 1400, 980),
+    monstro("Orc 4", "imagens/orcs/orc4.jpg", 1500, 990),
+    monstro("Orc 5", "imagens/orcs/orc5.jpg", 1600, 1000),
+
+    // NIVEL 5 - TROLLS
+    monstro("Troll 1", "imagens/trolls/troll1.jpg", 1700, 1010),
+    monstro("Troll 2", "imagens/trolls/troll2.jpg", 1800, 1020),
+    monstro("Troll 3", "imagens/trolls/troll3.jpg", 1900, 1030),
+    monstro("Troll 4", "imagens/trolls/troll4.jpg", 2000, 1040),
+    monstro("Troll 5", "imagens/trolls/troll5.jpg", 2100, 1050),
+
+    // NIVEL 6 - OGROS
+    monstro("Ogro 1", "imagens/ogros/ogro1.jpg", 2200, 1500),
+    monstro("Ogro 2", "imagens/ogros/ogro2.jpg", 2300, 1600),
+    monstro("Ogro 3", "imagens/ogros/ogro3.jpg", 2400, 1900),
+    monstro("Ogro 4", "imagens/ogros/ogro4.jpg", 2500, 1660),
+    monstro("Ogro 5", "imagens/ogros/ogro5.jpg", 2600, 1700),
+
+    // NIVEL 7 - FADAS
+    monstro("Fada 1", "imagens/fadas/fada1.jpg", 2700, 1750),
+    monstro("Fada 2", "imagens/fadas/fada2.jpg", 2800, 1760),
+    monstro("Fada 3", "imagens/fadas/fada3.jpg", 2900, 2000),
+    monstro("Fada 4", "imagens/fadas/fada4.jpg", 3000, 1900),
+    monstro("Fada 5", "imagens/fadas/fada5.jpg", 3100, 1950),
+
+    // NIVEL 8 - DRAGÕES
+    monstro("Dragão 1", "imagens/dragoes/dragao1.jpg", 3200, 2000),
+    monstro("Dragão 2", "imagens/dragoes/dragao2.jpg", 3400, 2500),
+    monstro("Dragão 3", "imagens/dragoes/dragao3.jpg", 3500, 4000),
+    monstro("Dragão 4", "imagens/dragoes/dragao4.jpg", 3600, 2650),
+    monstro("Dragão 5", "imagens/dragoes/dragao5.jpg", 3700, 2670),
+
+    // NIVEL 9 - MAGOS
+    monstro("Mago 1", "imagens/magos/mago1.jpg", 3800, 2700),
+    monstro("Mago 2", "imagens/magos/mago2.jpg", 3900, 2750),
+    monstro("Mago 3", "imagens/magos/mago3.jpg", 4000, 3000),
+    monstro("Mago 4", "imagens/magos/mago4.jpg", 4100, 2850),
+    monstro("Mago 5", "imagens/magos/mago5.jpg", 4200, 3000),
+
+    // NIVEL 10 - CEIFEIROS
+    monstro("Ceifeiro 1", "imagens/mortes/morte1.jpg", 4300, 3100),
+    monstro("Ceifeiro 2", "imagens/mortes/morte2.jpg", 4500, 3200),
+    monstro("Ceifeiro 3", "imagens/mortes/morte3.jpg", 4600, 4500),
+    monstro("Ceifeiro 4", "imagens/mortes/morte4.jpg", 4700, 3400),
+    monstro("Ceifeiro 5", "imagens/mortes/morte5.jpg", 4800, 3500),
+
+    // SACRIFÍCIOS
+    sacrificio("Sacrifício 1", "imagens/sacrificios/sacrificio1.jpg", 5000, 4500, 2),
+    sacrificio("Sacrifício 2", "imagens/sacrificios/sacrificio2.jpg", 5100, 4600, 2),
+    sacrificio("Sacrifício 3", "imagens/sacrificios/sacrificio3.jpg", 5200, 4700, 2),
+    sacrificio("Sacrifício 4", "imagens/sacrificios/sacrificio4.jpg", 5300, 4800, 2),
+    sacrificio("Sacrifício 5", "imagens/sacrificios/sacrificio5.jpg", 5400, 4900, 2),
+
+    // ESPECIAIS
+    { nome: "Vida", imagem: "imagens/especiais/vida.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Powerup", imagem: "imagens/especiais/powerup.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Equipar", imagem: "imagens/especiais/equipar.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Bloqueio", imagem: "imagens/especiais/bloqueio.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Chamado", imagem: "imagens/especiais/chamado.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Despertar", imagem: "imagens/especiais/despertar.jpg", tipo: "especial", ataque: 0, defesa: 0 },
+    { nome: "Trocal", imagem: "imagens/especiais/trocal.jpg", tipo: "especial", ataque: 0, defesa: 0 }
+];
+
+const quantidadePorImagem = {};
+// Soma as cartas que o jogador já tem no inventário ganho na arena
+inventarioArena.forEach(c => {
+    quantidadePorImagem[c.imagem] = (quantidadePorImagem[c.imagem] || 0) + 1;
+});
+
+function renderCatalogo() {
+    const container = document.getElementById("listaCartas");
+    container.innerHTML = "";
+    let lista = [...catalogo];
+    const termo = document.getElementById("buscaCarta").value.toLowerCase();
+
+    if (termo) lista = lista.filter(c => (c.nome || "").toLowerCase().includes(termo));
+
+    lista.forEach(carta => {
+        const div = document.createElement("div");
+        div.className = "carta-deck";
+        
+        const qtd = quantidadePorImagem[carta.imagem] || 0;
+        let desbloqueada = false;
+
+        // CARTAS INICIAIS SEMPRE LIBERADAS
+        const iniciaisSempreLiberadas = ["Planta 1", "Inseto 1", "Guerreiro 1", "Orc 1", "Vida", "Powerup", "Equipar"];
+        
+        if (iniciaisSempreLiberadas.includes(carta.nome)) {
+            desbloqueada = true;
+        } else if (carta.tipo === "robo") {
+            desbloqueada = nivel >= carta.nivelReq;
+        } else {
+            desbloqueada = qtd > 0;
+        }
+
+        if (!desbloqueada) div.classList.add("bloqueada");
+
+        const infoStats = (carta.tipo !== "especial")
+            ? `<div class="stats-mini"><span class="atk-text">⚔️ ${carta.ataque}</span><span class="def-text">🛡️ ${carta.defesa}</span></div>`
+            : `<div class="stats-mini"><span style="color:#666; font-weight:bold;">✨ ESPECIAL</span></div>`;
+
+        div.innerHTML = `
+            <img loading="lazy" src="${carta.imagem}">
+            <div class="info-carta">${carta.nome}</div>
+            ${infoStats}
+            ${(qtd > 0 && carta.tipo !== "robo") ? `<div class="qty-badge">x${qtd}</div>` : ""}
+            ${(carta.tipo === "robo" && !desbloqueada) ? `<div class="lock-msg" style="position:absolute; bottom:5px; color:red; font-size:10px; font-weight:bold;">NV. ${carta.nivelReq}</div>` : ""}
+        `;
+        container.appendChild(div);
+    });
+}
+
+renderCatalogo();
+document.getElementById("buscaCarta").addEventListener("input", renderCatalogo);
+</script>
+</body>
+</html>

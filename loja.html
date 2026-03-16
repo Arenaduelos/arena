@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Loja de Cartas - Arena</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="deck.css">
+    <link rel="stylesheet" href="loja.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="deck-container">
+        <div class="deck-toolbar">
+            <div class="toolbar-actions">
+                <button class="toolbar-btn btn-back" onclick="window.location.href='index.html'">VOLTAR</button>
+                <button class="toolbar-btn" onclick="window.location.href='deck.html'">VITRINE</button>
+                <button class="toolbar-btn" onclick="window.location.href='mdeck.html'">MEU DECK</button>
+                <button class="toolbar-btn btn-arena" onclick="window.location.href='logado.html'">ARENA ⚔️</button>
+            </div>
+            
+            <div class="toolbar-stats-filters">
+                <div class="stats-display" id="statsJogador">
+                    <!-- Stats preenchidos via JS -->
+                </div>
+
+                <div class="deck-filters">
+                    <label for="selectNivel">FILTRAR:</label>
+                    <select id="selectNivel" onchange="filtrarNivel(this.value)">
+                        <option value="1">1 (PLANTAS)</option>
+                        <option value="2">2 (INSETOS)</option>
+                        <option value="3">3 (GUERREIROS)</option>
+                        <option value="4">4 (ORCS)</option>
+                        <option value="5">5 (TROLLS)</option>
+                        <option value="6">6 (OGROS)</option>
+                        <option value="7">7 (FADAS)</option>
+                        <option value="8">8 (DRAGÕES)</option>
+                        <option value="9">9 (MAGOS)</option>
+                        <option value="10">10 (CEIFEIROS)</option>
+                        <option value="11">SACRIFÍCIO</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <h1 class="loja-title">Mercado Negro</h1>
+        
+        <div class="deck-grid" id="lojaGrid">
+            <!-- Cartas serão geradas via JS -->
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Compra -->
+    <div id="modalCompra" class="modal-compra" style="display:none;">
+        <div class="modal-content">
+            <h3>Confirmar Compra</h3>
+            <div id="infoCartaCompra"></div>
+            <div class="modal-actions">
+                <button id="btnConfirmar" class="btn-confirmar">COMPRAR</button>
+                <button id="btnCancelar" class="btn-cancelar" onclick="fecharModalCompra()">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="loja.js"></script>
+</body>
+</html>

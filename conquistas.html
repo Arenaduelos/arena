@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Conquistas</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="deck.css">
+</head>
+<body>
+    <div class="deck-container">
+        <div class="deck-toolbar">
+            <button class="toolbar-btn" onclick="window.location.href='deck.html'">VOLTAR</button>
+            <button class="toolbar-btn" onclick="window.location.href='logado.html'">IR PARA A ARENA ⚔️</button>
+            <span id="statsJogador"></span>
+        </div>
+        <h1>Conquistas</h1>
+        <div id="conquistasBox" class="deck-grid"></div>
+    </div>
+<script>
+const nome = localStorage.getItem("usuarioLogado");
+if (!nome) { window.location.href = "index.html"; }
+const nivel = parseInt(localStorage.getItem(`nivel_${nome}`)) || 1;
+const moedas = parseInt(localStorage.getItem(`moedas_${nome}`)) || 0;
+const vitorias = parseInt(localStorage.getItem(`vitorias_${nome}`)) || 0;
+document.getElementById("statsJogador").innerHTML = `Jogador: ${nome} | Nível: ${nivel} | 💰 ${moedas} | 🏆 Vitórias: ${vitorias}`;
+const deckSalvo = JSON.parse(localStorage.getItem(`deck_${nome}`)) || [];
+const quantidadePorImagem = {};
+deckSalvo.forEach(c => { quantidadePorImagem[c.imagem] = (quantidadePorImagem[c.imagem] || 0) + 1; });
+function monstro(nome, imagem, ataque, defesa) { return { nome, imagem, tipo: "monstro", ataque, defesa }; }
+function especial(nome, imagem, efeito) { return { nome, imagem, tipo: "especial", efeito }; }
+const catalogo = [
+    monstro("Planta 1", "imagens/plantas/planta1.jpg", 500, 400),
+    monstro("Planta 2", "imagens/plantas/planta2.jpg", 600, 450),
+    monstro("Planta 3", "imagens/plantas/planta3.jpg", 700, 500),
+    monstro("Planta 4", "imagens/plantas/planta4.jpg", 800, 550),
+    monstro("Planta 5", "imagens/plantas/planta5.jpg", 900, 600),
+    monstro("Inseto 1", "imagens/insetos/inseto1.jpg", 600, 650),
+    monstro("Inseto 2", "imagens/insetos/inseto2.jpg", 750, 700),
+    monstro("Inseto 3", "imagens/insetos/inseto3.jpg", 850, 750),
+    monstro("Inseto 4", "imagens/insetos/inseto4.jpg", 900, 800),
+    monstro("Inseto 5", "imagens/insetos/inseto5.jpg", 1000, 850),
+    monstro("Guerreiro 1", "imagens/guerreiros/guerreiro1.jpg", 1050, 860),
+    monstro("Guerreiro 2", "imagens/guerreiros/guerreiro2.jpg", 1100, 870),
+    monstro("Guerreiro 3", "imagens/guerreiros/guerreiro3.jpg", 1150, 880),
+    monstro("Guerreiro 4", "imagens/guerreiros/guerreiro4.jpg", 1200, 890),
+    monstro("Guerreiro 5", "imagens/guerreiros/guerreiro5.jpg", 1250, 900),
+    monstro("Orc 1", "imagens/orcs/orc1.jpg", 1200, 950),
+    monstro("Orc 2", "imagens/orcs/orc2.jpg", 1300, 960),
+    monstro("Orc 3", "imagens/orcs/orc3.jpg", 1400, 980),
+    monstro("Orc 4", "imagens/orcs/orc4.jpg", 1500, 990),
+    monstro("Orc 5", "imagens/orcs/orc5.jpg", 1600, 1000),
+    monstro("Troll 1", "imagens/trolls/troll1.jpg", 1700, 1010),
+    monstro("Troll 2", "imagens/trolls/troll2.jpg", 1800, 1020),
+    monstro("Troll 3", "imagens/trolls/troll3.jpg", 1900, 1030),
+    monstro("Troll 4", "imagens/trolls/troll4.jpg", 2000, 1040),
+    monstro("Troll 5", "imagens/trolls/troll5.jpg", 2100, 1050),
+    especial("Bloqueio", "imagens/especiais/bloqueio.jpg", "bloqueio"),
+    especial("Chamado", "imagens/especiais/chamado.jpg", "chamado"),
+    especial("Despertar", "imagens/especiais/despertar.jpg", "despertar"),
+    especial("Power Up", "imagens/especiais/powerup.jpg", "aumenta500"),
+    especial("Power Down", "imagens/especiais/powerdown.jpg", "diminui500"),
+    especial("Vida", "imagens/especiais/vida.jpg", "vida")
+];
+const box = document.getElementById("conquistasBox");
+box.innerHTML = "";
+catalogo.forEach(carta => {
+    const div = document.createElement("div");
+    div.className = "carta-deck";
+    const qtd = quantidadePorImagem[carta.imagem] || 0;
+    if (qtd === 0) div.classList.add("bloqueada");
+    const infoStats = carta.tipo === "monstro"
+        ? `<div class="stats-mini"><span class="atk-text">⚔️ ${carta.ataque}</span><span class="def-text">🛡️ ${carta.defesa}</span></div>`
+        : `<div class="stats-mini"><span style="color:#666;">✨ Especial</span></div>`;
+    div.innerHTML = `<img src="${carta.imagem}"><div class="info-carta">${carta.nome}</div>${infoStats}`;
+    if (qtd > 0) div.innerHTML += `<div class="qty-badge">x${qtd}</div>`;
+    box.appendChild(div);
+});
+</script>
+</body>
+</html>

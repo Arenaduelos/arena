@@ -64,7 +64,7 @@ input[type="text"], input[type="password"], input[type="email"] {
     background: rgba(255, 255, 255, 0.5);
     border: 2px solid #3d2b1f;
     border-radius: 3px;
-    font-family: inherit;
+    font-family: 'Arial', sans-serif; /* Alterado de inherit para permitir letras minúsculas */
     font-size: 1rem;
     color: #1a0f08;
     box-sizing: border-box;
