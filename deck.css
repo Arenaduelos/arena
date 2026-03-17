@@ -182,6 +182,30 @@ body {
 }
 
 @media (max-width: 600px) {
+    .deck-container {
+        width: 100%;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        min-height: 100vh;
+        padding: 10px;
+    }
+    .deck-grid {
+        max-height: none;
+        overflow-y: visible;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        padding: 10px;
+    }
+    .carta-deck {
+        height: 200px;
+    }
+    .carta-deck img {
+        height: 80px;
+    }
+    .info-carta {
+        font-size: 0.75rem;
+        height: 30px;
+    }
     .stats-display {
         gap: 10px;
         padding: 8px 15px;
@@ -216,7 +240,7 @@ h1 {
     padding: 20px;
     background: rgba(0, 0, 0, 0.15);
     border-radius: 10px;
-    max-height: 500px;
+    max-height: calc(100vh - 250px);
     overflow-y: auto;
     border: 2px inset var(--madeira);
 }

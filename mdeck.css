@@ -117,8 +117,22 @@
    .builder-row { flex-direction: column; } 
    .deck-slots { 
      grid-template-columns: repeat(3, 1fr); 
-     max-height: 60vh; 
+     max-height: 50vh; 
      overflow-y: auto; 
      padding-right: 4px; 
    } 
+   .deck-container {
+     width: 100%;
+     margin: 0;
+     border: none;
+     border-radius: 0;
+     min-height: 100vh;
+   }
+   .deck-grid {
+     max-height: none;
+     overflow-y: visible;
+   }
+   .panel {
+     min-height: auto;
+   }
  }
