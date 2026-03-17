@@ -1,20 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Arena de Duelo - Mini Duel</title>
-
-<link rel="stylesheet" href="logado.css">
-<link rel="stylesheet" href="css/modal.css">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Arena de Duelo - Mini Duel</title>
+    <link rel="stylesheet" href="logado.css">
+    <link rel="stylesheet" href="css/modal.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <!-- BARRA DE STATUS -->
 <div class="status-bar">
-
     <div class="status-lado">
         <span class="status-icone">👤</span>
         <span id="nomeUser">JOGADOR</span>
@@ -26,7 +23,7 @@
 
     <div class="status-centro">
         <div id="turnoAviso">SORTEANDO...</div>
-        <div id="placarMelhorDe3" style="color:gold; font-size:12px; font-weight:bold; margin-top:2px;">RODADA 1: 0 - 0</div>
+        <div id="placarMelhorDe3">RODADA 1: 0 - 0</div>
     </div>
 
     <div class="status-lado">
@@ -37,13 +34,10 @@
         MÁQUINA
         <span class="status-icone">🖥️</span>
     </div>
-
 </div>
 
-
-<!-- GAME WRAPPER (Novo Layout) -->
+<!-- GAME WRAPPER -->
 <div class="game-wrapper">
-
     <!-- COLUNA ESQUERDA (Sidebar: Cemitérios e Decks) -->
     <div class="side-col">
         <div id="cemiterioOponente" class="card-slot frame-c" data-label="GY"></div>
@@ -75,10 +69,6 @@
                 <span>📜</span>
             </button>
 
-            <button id="btnAtaqueDireto" class="action-icon-btn direct-atk" onclick="ataqueDireto()" style="display:none;" title="Ataque Direto">
-                <span>⚔️</span>
-            </button>
-
             <button id="btnSairJogo" class="action-icon-btn exit-game" onclick="window.location.href='mdeck.html'" title="Sair do Jogo">
                 <span>🚪</span>
             </button>
@@ -89,15 +79,14 @@
         <div id="especiaisJogador" class="grid suporte"></div>
     </div>
 
-    <!-- MÃOS LATERAIS (Hand Side) -->
+    <!-- MÃOS LATERAIS -->
     <div class="hand-side">
         <div id="maoOponente" class="fan"></div>
         <div id="minhaMao" class="fan"></div>
     </div>
-
 </div>
 
-<!-- LOG (Floating Panel) -->
+<!-- LOG PANEL -->
 <div class="log-panel" id="logPanel">
     <div class="log-header">
         <span>LOG DE BATALHA</span>
@@ -106,106 +95,30 @@
     <div id="logConteudo" class="log-conteudo"></div>
 </div>
 
-
-
 <!-- MODAL ROLETA -->
 <div id="modalRoleta" class="modal">
-
     <div class="modal-content">
-
         <h3>QUEM COMEÇA?</h3>
-
         <div class="roleta-moldura">
-
             <div id="roleta">
-
-                <div class="fatia voce">
-                    VOCÊ
-                </div>
-
-                <div class="fatia maquina">
-                    MÁQUINA
-                </div>
-
+                <div class="fatia voce">VOCÊ</div>
+                <div class="fatia maquina">MÁQUINA</div>
             </div>
-
         </div>
-
-        <button id="btnGirar" onclick="girarRoleta()">
-            GIRAR
-        </button>
-
+        <button id="btnGirar" onclick="girarRoleta()">GIRAR</button>
     </div>
-
 </div>
-
-
-
-<!-- MODAL RESULTADO -->
-<div id="modalResultado" class="modal">
-
-<div class="modal-content resultado-content">
-
-    <div id="resultadoTitulo" class="resultado-titulo"></div>
-
-    <div id="resultadoCartaBox"
-         class="resultado-carta-box"
-         style="display:none">
-
-        <p class="resultado-subtitulo">
-            CARTA DESBLOQUEADA
-        </p>
-
-        <img id="resultadoCartaImg" src="" alt="">
-
-        <div id="resultadoCartaInfo"></div>
-
-    </div>
-
-    <div id="resultadoMensagem" class="resultado-msg"></div>
-
-    <button onclick="location.reload()">
-        CONTINUAR
-    </button>
-
-</div>
-
-</div>
-
-
 
 <!-- MODAL AÇÃO -->
 <div id="modalPosicao" class="modal">
-
-<div class="modal-content">
-
-    <h3 id="textoModal">
-        ESCOLHA UMA AÇÃO
-    </h3>
-
-    <div id="botoesAcao"></div>
-
-    <button onclick="fecharModal()">
-        CANCELAR
-    </button>
-
-</div>
-
-</div>
-
-<!-- AVISO DE ROTAÇÃO -->
-<div id="avisoRotacao" class="aviso-rotacao">
-    <div class="aviso-rotacao-box">
-        <div class="aviso-rotacao-icon">🔄</div>
-        <h3>Melhor Experiência</h3>
-        <p>Gire seu celular para jogar na horizontal!</p>
-        <button onclick="document.getElementById('avisoRotacao').style.display='none'">ENTENDI</button>
+    <div class="modal-content">
+        <h3 id="textoModal">ESCOLHA UMA AÇÃO</h3>
+        <div id="botoesAcao"></div>
+        <button onclick="fecharModal()">CANCELAR</button>
     </div>
 </div>
 
-
-
-<!-- MODULOS DE JOGO -->
+<!-- SCRIPTS -->
 <script src="script.js"></script>
 
 </body>
