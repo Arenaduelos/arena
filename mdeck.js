@@ -4,17 +4,31 @@ if (!localStorage.getItem("usuarioLogado")) {
     window.location.href = "index.html";
 }
 
-// --- CONFIGURAÇÃO INICIAL (SE O INVENTÁRIO ESTIVER VAZIO OU DEFASADO) ---
-let meuBau = JSON.parse(localStorage.getItem(`deck_inventory_${nomeUsuario}`)) || [];
+// --- FUNÇÃO PARA NORMALIZAR DADOS DE CARTA (MIGRAÇÃO DE PROPRIEDADES ANTIGAS) ---
+function normalizarCarta(c) {
+    if (!c) return null;
+    return {
+        nome: c.nome || c.n || "Sem Nome",
+        imagem: c.imagem || c.img || "imagens/back.jpg",
+        tipo: c.tipo || c.t || "monstro",
+        ataque: parseInt(c.ataque || c.a || 0),
+        defesa: parseInt(c.defesa || c.d || 0),
+        sacrifio: parseInt(c.sacrifio || c.s || 0)
+    };
+}
+
+// --- CONFIGURAÇÃO INICIAL ---
+let meuBauRaw = JSON.parse(localStorage.getItem(`deck_inventory_${nomeUsuario}`)) || [];
+let meuBau = meuBauRaw.map(normalizarCarta).filter(Boolean);
 
 const COMPOSICAO_INICIAL = [
-    { img: "imagens/plantas/planta1.jpg", n: "Planta 1", t: "monstro", a: 500, d: 400, q: 7 },
-    { img: "imagens/insetos/inseto1.jpg", n: "Inseto 1", t: "monstro", a: 600, d: 650, q: 5 },
-    { img: "imagens/guerreiros/guerreiro1.jpg", n: "Guerreiro 1", t: "monstro", a: 1050, d: 860, q: 5 },
-    { img: "imagens/orcs/orc1.jpg", n: "Orc 1", t: "monstro", a: 1200, d: 950, q: 5 },
-    { img: "imagens/especiais/vida.jpg", n: "Vida", t: "especial", a: 0, d: 0, q: 2 },
-    { img: "imagens/especiais/powerup.jpg", n: "Powerup", t: "especial", a: 0, d: 0, q: 2 },
-    { img: "imagens/especiais/equipar.jpg", n: "Equipar", t: "especial", a: 0, d: 0, q: 2 }
+    { imagem: "imagens/plantas/planta1.jpg", nome: "Planta 1", tipo: "monstro", ataque: 500, defesa: 400, q: 7 },
+    { imagem: "imagens/insetos/inseto1.jpg", nome: "Inseto 1", tipo: "monstro", ataque: 600, defesa: 650, q: 5 },
+    { imagem: "imagens/guerreiros/guerreiro1.jpg", nome: "Guerreiro 1", tipo: "monstro", ataque: 1050, defesa: 860, q: 5 },
+    { imagem: "imagens/orcs/orc1.jpg", nome: "Orc 1", tipo: "monstro", ataque: 1200, defesa: 950, q: 5 },
+    { imagem: "imagens/especiais/vida.jpg", nome: "Vida", tipo: "especial", ataque: 0, defesa: 0, q: 2 },
+    { imagem: "imagens/especiais/powerup.jpg", nome: "Powerup", tipo: "especial", ataque: 0, defesa: 0, q: 2 },
+    { imagem: "imagens/especiais/equipar.jpg", nome: "Equipar", tipo: "especial", ataque: 0, defesa: 0, q: 2 }
 ];
 
 // FORÇAR RESET SE O JOGADOR ESTIVER SEM AS CARTAS BÁSICAS DO NÍVEL 1
@@ -22,24 +36,28 @@ const temPlanta1 = meuBau.some(c => c.nome === "Planta 1");
 const temInseto1 = meuBau.some(c => c.nome === "Inseto 1");
 
 // O reset agora só ocorre se o baú estiver vazio ou se o jogador não tiver as cartas iniciais obrigatórias.
-// Removemos o check de "monstrosAvancados" para permitir que o jogador progrida e ganhe novas cartas sem ser resetado.
 if (meuBau.length === 0 || !temPlanta1 || !temInseto1) {
     console.log("Sistema detectou deck incompleto ou novo jogador. Aplicando composição inicial oficial...");
     meuBau = [];
     COMPOSICAO_INICIAL.forEach(item => {
         for (let i = 0; i < item.q; i++) {
-            meuBau.push({ nome: item.n, imagem: item.img, tipo: item.t, ataque: item.a, defesa: item.d });
+            meuBau.push({ 
+                nome: item.nome, 
+                imagem: item.imagem, 
+                tipo: item.tipo, 
+                ataque: item.ataque, 
+                defesa: item.defesa 
+            });
         }
     });
     localStorage.setItem(`deck_inventory_${nomeUsuario}`, JSON.stringify(meuBau));
     localStorage.removeItem(`deck_build_${nomeUsuario}`);
-    // Força o recarregamento para limpar a memória do navegador
     window.location.reload();
 }
 
 // --- DECK QUE ESTÁ SENDO MONTADO (BOX ESQUERDO) ---
-// Carrega o deck salvo ou inicia com a composição padrão se for a primeira vez ou estiver quebrado
-let slotsAtivos = JSON.parse(localStorage.getItem(`deck_build_${nomeUsuario}`));
+let slotsAtivosRaw = JSON.parse(localStorage.getItem(`deck_build_${nomeUsuario}`)) || [];
+let slotsAtivos = slotsAtivosRaw.map(s => s ? normalizarCarta(s) : null);
 
 const deckTemPlanta = slotsAtivos && slotsAtivos.some(s => s && s.nome === "Planta 1");
 const deckTemInseto = slotsAtivos && slotsAtivos.some(s => s && s.nome === "Inseto 1");
@@ -50,10 +68,15 @@ if (!slotsAtivos || slotsAtivos.every(s => s === null) || !deckTemPlanta || !dec
     slotsAtivos = [];
     COMPOSICAO_INICIAL.forEach(item => {
         for (let i = 0; i < item.q; i++) {
-            slotsAtivos.push({ nome: item.n, imagem: item.img, tipo: item.t, ataque: item.a, defesa: item.d });
+            slotsAtivos.push({ 
+                nome: item.nome, 
+                imagem: item.imagem, 
+                tipo: item.tipo, 
+                ataque: item.ataque, 
+                defesa: item.defesa 
+            });
         }
     });
-    // Garante que o deck tenha exatamente 28 slots
     while(slotsAtivos.length < 28) slotsAtivos.push(null);
     if(slotsAtivos.length > 28) slotsAtivos = slotsAtivos.slice(0, 28);
     

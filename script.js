@@ -1,5 +1,5 @@
 /* === VARIÁVEIS DE ESTADO === */
-let vidaJogador = 5000, vidaOponente = 5000;  
+let vidaJogador = 5000, vidaOponente = 5000;
 let turnoAtual = "";
 let jaInvocouMonstro = false;
 let jaComprouCarta = false;     
@@ -180,12 +180,19 @@ function concederPremios() {
     let estrelasAtuais = parseInt(localStorage.getItem(`vits_no_nivel_${usuario}`)) || 0;
     estrelasAtuais += vitoriasRodadaJogador; // Ganha estrelas pelas rodadas vencidas
 
-    // Lógica de Moedas baseada no Nível
-    let premioMoedas = 5000; // Padrão para nível 8+
-    if (nivelAtual === 1) premioMoedas = 300000;
-    else if (nivelAtual === 2) premioMoedas = 200000;
-    else if (nivelAtual === 3) premioMoedas = 100000;
-    else if (nivelAtual >= 4 && nivelAtual <= 7) premioMoedas = 50000;
+    // Lógica de Moedas baseada na quantidade de vitórias (cada vez que ganha diminui)
+    let premioMoedas = 2000; // Padrão da 9ª vitória em diante
+    const vitoriaNumero = vitoriasAtuais + 1; // Próxima vitória (a que estamos ganhando agora)
+
+    if (vitoriaNumero === 1) premioMoedas = 300000;
+    else if (vitoriaNumero === 2) premioMoedas = 200000;
+    else if (vitoriaNumero === 3) premioMoedas = 100000;
+    else if (vitoriaNumero === 4) premioMoedas = 50000;
+    else if (vitoriaNumero === 5) premioMoedas = 35000;
+    else if (vitoriaNumero === 6) premioMoedas = 25000;
+    else if (vitoriaNumero === 7) premioMoedas = 13000;
+    else if (vitoriaNumero === 8) premioMoedas = 5000;
+    else if (vitoriaNumero >= 9) premioMoedas = 2000;
 
     moedasAtuais += premioMoedas;
     vitoriasAtuais += 1; // Vitória de partida (Melhor de 3)
@@ -644,8 +651,7 @@ function girarRoleta() {
                 
                 // Toca sons sem bloquear
                 tocarSom("efeitosonoros/roleta.ogg");
-                try { new Audio("efeitosonoros/abertura.ogg").play().catch(()=>{}); } catch(e){}
-
+                new Audio("efeitosonoros/abertura.ogg").play();
                 // Inicia a lógica da arena após o giro
                 setTimeout(() => iniciarPartidaAposGiro(sortei), 3200);
             }, 50);
@@ -792,15 +798,11 @@ function resolverCombate(mIdx, oIdx, atacanteEhJogador) {
     let atacante = atacanteEhJogador ? monstrosJogador[mIdx] : monstrosOponente[mIdx];
     let defensor = atacanteEhJogador ? monstrosOponente[oIdx] : monstrosJogador[oIdx];
     if (!atacante || !defensor) return;
-
-    const nomeDefensorOriginal = defensor.revelada ? defensor.nome : "um monstro oculto";
     defensor.revelada = true;
-    
     let pontosDef = defensor.modo === "ataque" ? defensor.ataque : defensor.defesa;
     let dif = atacante.ataque - pontosDef;
-    
     if (dif > 0) {
-        logBatalha(`${atacante.nome} destruiu ${nomeDefensorOriginal}!`, "cura");
+        logBatalha(`${atacante.nome} destruiu ${defensor.nome}!`, "cura");
         
         // --- REMOVER BLOQUEIO SE O ALVO FOR DESTRUÍDO ---
         if (defensor.bloqueado) {
@@ -1105,7 +1107,7 @@ function turnoDaMaquina() {
         });
 
         setTimeout(() => {
-            // --- 4. FIM DO TURNO DA MÁQUINA ---
+            // --- 4. FIM DO TURNO DA MÁQUINA ---\
             finalizarTurnoMaquina();
         }, 1000);
     }, 1000);
@@ -1326,20 +1328,31 @@ function renderLinha(id, lista, isJogador, tipoLinha) {
             const imgPath = (c.revelada || isJogador) ? c.imagem : "imagens/back.jpg";
             if (c.modo === "defesa") div.classList.add("modo-defesa");
             
-            // Container da imagem
             const img = document.createElement("img");
             img.src = imgPath;
             img.className = "carta-img";
             div.appendChild(img);
 
             if (tipoLinha === "combate" && (c.revelada || isJogador)) {
+                // Indicador de Stance (ATK/DEF)
+                const stance = document.createElement("div");
+                stance.className = `stance-indicator ${c.modo === 'ataque' ? 'atk' : 'def'}`;
+                stance.innerText = c.modo === 'ataque' ? 'A' : 'D';
+                div.appendChild(stance);
+
+                // Efeito de Bloqueio
                 if (c.bloqueado) {
-                    const tag = document.createElement("div");
-                    tag.className = "bloqueio-tag";
-                    tag.innerText = `BLOQUEADO (${c.turnosBloqueio})`;
-                    div.appendChild(tag);
+                    const efeito = document.createElement("div");
+                    efeito.className = "bloqueado-effect";
+                    div.appendChild(efeito);
+
+                    const contador = document.createElement("div");
+                    contador.className = "bloqueio-contador";
+                    contador.innerText = c.turnosBloqueio;
+                    div.appendChild(contador);
                 }
                 
+                // Stats de ATK/DEF
                 const status = document.createElement("div");
                 status.className = "status-dual";
                 status.innerHTML = `

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --bg: #050505;
+            --gold: #bfa100;
+            --txt-yellow: #ffff00;
+            --txt-green: #00ff00;
+            --slot-bg: rgba(255, 255, 255, 0.05);
+            /* Tamanhos responsivos baseados na largura da tela (vw) */
+            --card-w: 15vw; 
+            --card-h: calc(var(--card-w) * 1.4);
+            --max-w: 80px;
+            --max-h: 112px;
+        }
+
+        @media (min-width: 600px) {
+            :root { --card-w: 80px; --card-h: 112px; }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg);
+            color: #fff;
+            font-family: sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Barra de Status (Compacta) */
+        .status-bar {
+            height: 6vh;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            font-size: 11px;
+            background: #111;
+            border-bottom: 1px solid #333;
+        }
+
+        /* Container que aproxima as colunas */
+        .game-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center; /* Centraliza o bloco todo */
+            align-items: center;
+            padding: 5px;
+            gap: 8px; /* Espaço mínimo entre laterais e campo */
+        }
+
+        /* Colunas Laterais */
+        .side-col {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 90%;
+            width: var(--card-w);
+            max-width: var(--max-w);
+        }
+
+        /* Slots Padronizados */
+        .card-slot {
+            width: 100%;
+            height: var(--card-h);
+            max-height: var(--max-h);
+            border-radius: 4px;
+            background: var(--slot-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: rgba(255,255,255,0.2);
+        }
+        .frame-b { border: 1px solid var(--gold); color: var(--gold); }
+        .frame-c { border: 1px dashed #444; }
+
+        /* Campo de Batalha Central */
+        .board {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 90%;
+            gap: 5px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, var(--card-w));
+            grid-auto-columns: max-content;
+            gap: 5px;
+        }
+        
+        .grid .card-slot { max-width: var(--max-w); }
+
+        /* Barra de Ação Central */
+        .action-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+        }
+
+        .btn {
+            padding: 6px 10px;
+            font-size: 9px;
+            font-weight: bold;
+            border: 1px solid #fff;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .log-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #fff;
+            cursor: pointer;
+        }
+
+        /* Mãos Laterais (Aproximação máxima) */
+        .hand-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 90%;
+            width: calc(var(--card-w) + 20px); /* Espaço extra para o leque */
+        }
+
+        .fan {
+            position: relative;
+            width: 100%;
+            height: var(--card-h);
+            max-height: var(--max-h);
+        }
+
+        .m-card {
+            position: absolute;
+            width: var(--card-w);
+            height: var(--card-h);
+            max-width: var(--max-w);
+            max-height: var(--max-h);
+            background: #1a1a1a;
+            border: 1px solid var(--gold);
+            border-radius: 4px;
+            left: 10px;
+        }
+
+        .m-card:nth-child(1) { transform: rotate(-10deg) translateX(-15px); }
+        .m-card:nth-child(2) { transform: rotate(0deg) translateY(-4px); z-index: 2; }
+        .m-card:nth-child(3) { transform: rotate(10deg) translateX(15px); z-index: 3; }
+
+        .m-stats {
+            position: absolute; bottom: 0; width: 100%;
+            background: #00008b; font-size: 7px; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="status-bar">
+        <div>EVE: <span style="color:var(--txt-green)">6000 LP</span></div>
+        <div style="color:var(--txt-yellow)">TURNO JOGADOR</div>
+        <div>MÁQ: <span style="color:var(--txt-green)">5000 LP</span></div>
+    </div>
+
+    <div class="game-wrapper">
+        <div class="side-col">
+            <div class="card-slot frame-b">B</div>
+            <div class="card-slot frame-c">C1</div>
+            <div class="card-slot frame-c">C2</div>
+            <div class="card-slot frame-b">B</div>
+        </div>
+
+        <div class="board">
+            <div class="grid">
+                <div class="card-slot">1</div><div class="card-slot">1</div><div class="card-slot">1</div>
+                <div class="card-slot">2</div><div class="card-slot">2</div><div class="card-slot">2</div>
+            </div>
+
+            <div class="action-bar">
+                <div class="btn" style="background:#500">SAIR</div>
+                <div class="log-btn">📝
+				</div>
+                <div class="btn" style="background:#440">PASSAR</div>
+            </div>
+
+            <div class="grid">
+                <div class="card-slot">2</div><div class="card-slot">2</div><div class="card-slot">2</div>
+                <div class="card-slot">1</div><div class="card-slot">1</div><div class="card-slot">1</div>
+            </div>
+        </div>
+
+        <div class="hand-side">
+            <div class="fan">
+                <div class="m-card"></div><div class="m-card"></div><div class="m-card"></div>
+            </div>
+            <div class="fan">
+                <div class="m-card"><div class="m-stats">1200|800</div></div>
+                <div class="m-card"><div class="m-stats">1500|400</div></div>
+                <div class="m-card"><div class="m-stats">900|1100</div></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

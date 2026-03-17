@@ -42,7 +42,7 @@ function renderCemiterio() {
         cj.innerHTML = "";
         if (cemiterioJogador.length > 0) {
             const ultima = cemiterioJogador[cemiterioJogador.length - 1];
-            cj.innerHTML = `<img src="${ultima.imagem}" class="carta-img" style="opacity: 0.6; filter: grayscale(50%);">`;
+            cj.innerHTML = `<img src="${ultima.imagem}" class="carta-img">`;
             cj.innerHTML += `<div class="gy-count">${cemiterioJogador.length}</div>`;
         }
     }
@@ -51,7 +51,7 @@ function renderCemiterio() {
         co.innerHTML = "";
         if (cemiterioOponente.length > 0) {
             const ultimaOp = cemiterioOponente[cemiterioOponente.length - 1];
-            co.innerHTML = `<img src="${ultimaOp.imagem}" class="protection-img" style="opacity: 0.6; filter: grayscale(50%);">`;
+            co.innerHTML = `<img src="${ultimaOp.imagem}" class="carta-img">`;
             co.innerHTML += `<div class="gy-count">${cemiterioOponente.length}</div>`;
         }
     }
@@ -62,8 +62,17 @@ function criarCartaHTML(c, isJogador, tipoLinha, index) {
     let html = `<img src="${imgPath}" class="carta-img">`;
     
     if (tipoLinha === "combate" && (c.revelada || isJogador)) {
-        let statusBloqueio = c.bloqueado ? `<div class="bloqueio-tag">BLOQUEADO (${c.turnosBloqueio})</div>` : "";
-        html += statusBloqueio;
+        // Adiciona o indicador de modo (ATK/DEF)
+        const stanceClass = c.modo === 'ataque' ? 'atk' : 'def';
+        const stanceText = c.modo === 'ataque' ? 'A' : 'D';
+        html += `<div class="stance-indicator ${stanceClass}">${stanceText}</div>`;
+
+        // Adiciona o efeito de bloqueio se a carta estiver bloqueada
+        if (c.bloqueado) {
+            html += `<div class="bloqueado-effect"></div>`;
+            html += `<div class="bloqueio-contador">${c.turnosBloqueio}</div>`;
+        }
+
         html += `
             <div class="status-dual">
                 <div class="stat-box">
@@ -77,9 +86,10 @@ function criarCartaHTML(c, isJogador, tipoLinha, index) {
             </div>`;
     }
     
-    if (tipoLinha === "suporte" && c.revelada && c.imagem.includes("bloqueio.jpg")) {
-        html += `<div class="alvo-tag">ALVO: ${c.vinculo + 1}</div>`;
-    }
+    // Remove a renderização da carta "Bloqueio" no slot de suporte
+    // if (tipoLinha === "suporte" && c.revelada && c.imagem.includes("bloqueio.jpg")) {
+    //     html += `<div class="alvo-tag">ALVO: ${c.vinculo + 1}</div>`;
+    // }
     
     return html;
 }
@@ -125,7 +135,7 @@ function atualizarTela() {
         minhaMao.forEach((c, i) => {
             const carta = document.createElement("div");
             carta.className = "carta-mao";
-            carta.innerHTML = `<img src="${c.imagem}">`;
+            carta.innerHTML = `<img src="${c.imagem}" class="carta-img">`;
             if (c.tipo === "monstro") {
                 carta.innerHTML += `<div class="mao-stats"><span style="color:#3498db">${c.ataque}</span> <span style="color:#ffff00">${c.defesa}</span></div>`;
             }
