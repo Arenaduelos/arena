@@ -68,16 +68,45 @@ function animarContagemHP(id, inicio, fim, duracao) {
     window.requestAnimationFrame(step);
 }
 
+// --- FUNÇÃO PARA EXIBIR EFEITO DE DANO/CURA ---
+function mostrarEfeitoPontos(alvo, valor) {
+    const elId = alvo === "jogador" ? "vidaJogador" : "vidaOponente";
+    const el = document.getElementById(elId);
+    if (!el) return;
+    
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top;
+    
+    const div = document.createElement("div");
+    div.className = `floating-number ${valor < 0 ? 'dano' : 'cura'}`;
+    div.innerText = (valor > 0 ? "+" : "") + valor;
+    div.style.left = x + "px";
+    div.style.top = y + "px";
+    
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 1500);
+}
+
 // --- FUNÇÕES PARA ATUALIZAR VIDA COM SOM ---
 function alterarVida(alvo, novoValor) {
     const antigoValor = alvo === "jogador" ? vidaJogador : vidaOponente;
     if (antigoValor !== novoValor) {
-        if (alvo === "jogador") vidaJogador = Math.max(0, novoValor);
-        else vidaOponente = Math.max(0, novoValor);
+        const diferenca = novoValor - antigoValor;
         
-        tocarSom("efeitosonoros/prpontos.ogg");
-        atualizarTela();
-        verificarFimJogo();
+        // Primeiro mostra o efeito visual (números flutuantes)
+        mostrarEfeitoPontos(alvo, diferenca);
+        
+        // Delay maior para o jogador ver os pontos antes de mudar o valor e tocar o som
+        setTimeout(() => {
+            if (alvo === "jogador") vidaJogador = Math.max(0, novoValor);
+            else vidaOponente = Math.max(0, novoValor);
+            
+            // Toca o som APÓS o efeito visual de pontos flutuantes
+            tocarSom("efeitosonoros/prpontos.ogg");
+            atualizarTela();
+            verificarFimJogo();
+        }, 800);
     }
 }
 
@@ -850,171 +879,175 @@ function resolverCombate(mIdx, oIdx, atacanteEhJogador) {
     atualizarTela();
 }
 
-function turnoDaMaquina() {
-    comprarCarta("oponente");
-    totalTurnosPartida++; // Incrementa turno
+async function turnoDaMaquina() {
+    logBatalha("Turno da Máquina...", "info");
+    await new Promise(r => setTimeout(r, 1500)); // Delay inicial do turno
     
-    // --- 1. USO DE CARTAS ESPECIAIS DA MÃO ---
+    comprarCarta("oponente");
+    totalTurnosPartida++; 
+    await new Promise(r => setTimeout(r, 1200)); // Delay após compra
+    
+    // --- 1. USO DE CARTAS ESPECIAIS DA MÃO (COM DELAY E FEEDBACK VISUAL) ---
     let especiaisMao = maoOponente.filter(c => c.tipo === "especial");
-    especiaisMao.forEach(esp => {
+    for (const esp of especiaisMao) {
         const img = esp.imagem.toLowerCase();
         let usou = false;
+        let msgIA = "";
+        let acaoIA = null;
 
         if (img.includes("vida.jpg") && vidaOponente < 4000) {
-            alterarVida("oponente", vidaOponente + 500);
-            logBatalha(`Máquina usou Vida e recuperou 500 LP!`, "cura");
+            msgIA = "Máquina usa Vida e recupera 500 LP!";
+            acaoIA = () => {
+                tocarSom("efeitosonoros/vida.ogg");
+                alterarVida("oponente", vidaOponente + 500);
+            };
             usou = true;
         } else if (img.includes("powerup.jpg")) {
             let alvos = monstrosOponente.filter(m => m !== null);
             if (alvos.length > 0) {
-                tocarSom("efeitosonoros/powerup.ogg");
                 let alvo = alvos.sort((a,b) => b.ataque - a.ataque)[0];
-                alvo.ataque += 300; alvo.defesa += 300;
-                logBatalha(`Máquina usou PowerUp em ${alvo.nome}`, "info");
+                msgIA = `Máquina usa PowerUp em ${alvo.nome}!`;
+                acaoIA = () => {
+                    tocarSom("efeitosonoros/powerup.ogg");
+                    alvo.ataque += 300; alvo.defesa += 300;
+                };
                 usou = true;
             }
         } else if (img.includes("powerdown.jpg")) {
             let alvosJ = monstrosJogador.filter(m => m !== null);
             if (alvosJ.length > 0) {
-                tocarSom("efeitosonoros/powerdown.ogg");
                 let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
-                alvo.ataque = Math.max(0, alvo.ataque - 300);
-                alvo.defesa = Math.max(0, alvo.defesa - 300);
-                logBatalha(`Máquina usou PowerDown em ${alvo.nome}`, "dano");
+                msgIA = `Máquina usa PowerDown em ${alvo.nome}!`;
+                acaoIA = () => {
+                    tocarSom("efeitosonoros/powerdown.ogg");
+                    alvo.ataque = Math.max(0, alvo.ataque - 300);
+                    alvo.defesa = Math.max(0, alvo.defesa - 300);
+                };
                 usou = true;
             }
         } else if (img.includes("bloqueio.jpg")) {
             let alvosJ = monstrosJogador.filter(m => m !== null && !m.bloqueado);
-            if (alvosJ.length > 0) {
+            let slotEsp = especiaisOponente.findIndex(s => s === null);
+            if (alvosJ.length > 0 && slotEsp !== -1) {
                 let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
-                let idxJ = monstrosJogador.indexOf(alvo);
-                let slotEsp = especiaisOponente.findIndex(s => s === null);
-                if (slotEsp !== -1) {
-                    tocarSom("efeitosonoros/carta.ogg");
+                let alvoIdx = monstrosJogador.indexOf(alvo);
+                msgIA = `Máquina bloqueia ${alvo.nome}!`;
+                acaoIA = () => {
                     alvo.bloqueado = true;
                     alvo.turnosBloqueio = 3;
-                    especiaisOponente[slotEsp] = { ...esp, revelada: true, vinculo: idxJ, turnosRestantes: 3 };
-                    logBatalha(`Máquina bloqueou ${alvo.nome}!`, "info");
-                    usou = true;
-                }
+                    especiaisOponente[slotEsp] = { ...esp, revelada: true, vinculo: alvoIdx, turnosRestantes: 3 };
+                };
+                usou = true;
             }
         } else if (img.includes("chamado.jpg")) {
             let alvosJ = monstrosJogador.filter(m => m !== null);
             if (alvosJ.length > 0) {
-                tocarSom("efeitosonoros/carta.ogg");
                 let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
-                let idxJ = monstrosJogador.indexOf(alvo);
-                
-                // ... (remover bloqueio) ...
-                if (alvo.bloqueado) {
-                    const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idxJ && e.imagem.includes("bloqueio.jpg"));
-                    if (idxEsp !== -1) {
-                        cemiterioOponente.push(especiaisOponente[idxEsp]);
-                        especiaisOponente[idxEsp] = null;
+                let alvoIdx = monstrosJogador.indexOf(alvo);
+                msgIA = `Máquina usa Chamado e destrói ${alvo.nome}!`;
+                acaoIA = () => {
+                    if (alvo.bloqueado) {
+                        const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === alvoIdx && e.imagem.includes("bloqueio.jpg"));
+                        if (idxEsp !== -1) { cemiterioOponente.push(especiaisOponente[idxEsp]); especiaisOponente[idxEsp] = null; }
                     }
-                }
-
-                cemiterioJogador.push(monstrosJogador[idxJ]);
-                monstrosJogador[idxJ] = null;
-                logBatalha(`Máquina usou Chamado e destruiu ${alvo.nome}!`, "info");
+                    cemiterioJogador.push(alvo);
+                    monstrosJogador[alvoIdx] = null;
+                };
                 usou = true;
             }
         } else if (img.includes("trocal.jpg")) {
             let alvosJ = monstrosJogador.filter(m => m !== null);
             let slotLivre = monstrosOponente.findIndex(s => s === null);
             if (alvosJ.length > 0 && slotLivre !== -1) {
-                tocarSom("efeitosonoros/trocal.ogg");
                 let alvo = alvosJ.sort((a,b) => b.ataque - a.ataque)[0];
-                let idxJ = monstrosJogador.indexOf(alvo);
-
-                // --- REMOVER BLOQUEIO DA MÁQUINA SE O ALVO DO JOGADOR FOR ROUBADO ---
-                if (alvo.bloqueado) {
-                    const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === idxJ && e.imagem.includes("bloqueio.jpg"));
-                    if (idxEsp !== -1) {
-                        cemiterioOponente.push(especiaisOponente[idxEsp]);
-                        especiaisOponente[idxEsp] = null;
+                let alvoIdx = monstrosJogador.indexOf(alvo);
+                msgIA = `Máquina usa Trocal e rouba seu ${alvo.nome}!`;
+                acaoIA = () => {
+                    tocarSom("efeitosonoros/trocal.ogg");
+                    if (alvo.bloqueado) {
+                        const idxEsp = especiaisOponente.findIndex(e => e && e.vinculo === alvoIdx && e.imagem.includes("bloqueio.jpg"));
+                        if (idxEsp !== -1) { cemiterioOponente.push(especiaisOponente[idxEsp]); especiaisOponente[idxEsp] = null; }
                     }
-                }
-
-                monstrosOponente[slotLivre] = { 
-                    ...alvo, 
-                    roubado: true, 
-                    turnosRoubo: 2, 
-                    donoOriginal: "jogador", 
-                    revelada: true, 
-                    jaAtacou: false,
-                    bloqueado: false // Limpa bloqueio ao mudar de lado
+                    monstrosOponente[slotLivre] = { ...alvo, roubado: true, turnosRoubo: 2, donoOriginal: "jogador", revelada: true, jaAtacou: false, bloqueado: false };
+                    monstrosJogador[alvoIdx] = null;
                 };
-                monstrosJogador[idxJ] = null;
-                logBatalha(`Máquina usou Trocal e roubou seu ${alvo.nome}!`, "info");
                 usou = true;
             }
         } else if (img.includes("despertar.jpg")) {
             let monstrosCemiterio = cemiterioOponente.filter(c => c.tipo === "monstro");
             if (monstrosCemiterio.length > 0 && maoOponente.length < 5) {
-                tocarSom("efeitosonoros/carta.ogg");
                 let m = monstrosCemiterio.sort((a,b) => b.ataque - a.ataque)[0];
-                cemiterioOponente.splice(cemiterioOponente.indexOf(m), 1);
-                maoOponente.push(m);
-                logBatalha(`Máquina despertou ${m.nome} do cemitério!`, "info");
+                msgIA = `Máquina desperta ${m.nome} do cemitério!`;
+                acaoIA = () => {
+                    cemiterioOponente.splice(cemiterioOponente.indexOf(m), 1);
+                    maoOponente.push(m);
+                };
                 usou = true;
             }
         } else if (img.includes("equipar.jpg")) {
             let alvos = monstrosOponente.filter(m => m !== null && !m.imagem.includes("robo"));
             if (alvos.length > 0) {
+                const roboNivel = nivelAtual <= 5 ? nivelAtual : 5;
                 const robos = [
-                    { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800, nivelReq: 1 },
-                    { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000, nivelReq: 2 },
-                    { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200, nivelReq: 3 },
-                    { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500, nivelReq: 4 },
-                    { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800, nivelReq: 5 }
-                ].filter(r => nivelAtual >= r.nivelReq);
-                if (robos.length > 0) {
-                    tocarSom("efeitosonoros/equipar.ogg");
-                    let robo = robos[robos.length - 1]; // Pega o melhor robô disponível
-                    let alvo = alvos.sort((a,b) => a.ataque - b.ataque)[0]; // Equipar no mais fraco
-                    if (alvo.ataque < robo.ataque) {
+                    { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800 },
+                    { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000 },
+                    { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200 },
+                    { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500 },
+                    { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800 }
+                ];
+                const robo = robos[roboNivel - 1];
+                let alvo = alvos.sort((a,b) => a.ataque - b.ataque)[0];
+                if (alvo.ataque < robo.ataque) {
+                    msgIA = `Máquina equipa seu ${alvo.nome} e agora é uma super máquina: ${robo.nome}!`;
+                    acaoIA = () => {
+                        tocarSom("efeitosonoros/equipar.ogg");
                         alvo.nome = robo.nome; alvo.imagem = robo.imagem;
                         alvo.ataque = robo.ataque; alvo.defesa = robo.defesa;
-                        logBatalha(`Máquina equipou ${robo.nome}!`, "info");
-                        usou = true;
-                    }
+                    };
+                    usou = true;
                 }
             }
         } else if (img.includes("fusao.jpg")) {
             let monstrosCampo = monstrosOponente.filter(m => m !== null);
             let monstrosMao = maoOponente.filter(c => c.tipo === "monstro");
             if (monstrosCampo.length > 0 && monstrosMao.length > 0) {
-                tocarSom("efeitosonoros/fusao.ogg");
-                let mutante;
-                if (nivelAtual <= 5) mutante = { nome: "Mutante 1", imagem: "imagens/mutantes/mutante1.jpg", ataque: 2500, defesa: 2000, tipo: "monstro" };
-                else if (nivelAtual <= 10) mutante = { nome: "Mutante 2", imagem: "imagens/mutantes/mutante2.jpg", ataque: 3000, defesa: 2500, tipo: "monstro" };
-                else mutante = { nome: "Mutante 3", imagem: "imagens/mutantes/mutante3.jpg", ataque: 3500, defesa: 2900, tipo: "monstro" };
-                
                 let mCampo = monstrosCampo.sort((a,b) => a.ataque - b.ataque)[0];
                 let mMao = monstrosMao.sort((a,b) => a.ataque - b.ataque)[0];
-                
-                cemiterioOponente.push(mCampo);
-                cemiterioOponente.push(maoOponente.splice(maoOponente.indexOf(mMao), 1)[0]);
-                
-                let idxCampo = monstrosOponente.indexOf(mCampo);
-                monstrosOponente[idxCampo] = { ...mutante, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
-                tocarSom("efeitosonoros/carta.ogg");
-                logBatalha(`Máquina realizou Fusão: ${mutante.nome}!`, "info");
+                msgIA = "Máquina realiza uma Fusão!";
+                acaoIA = () => {
+                    tocarSom("efeitosonoros/fusao.ogg");
+                    let mutante = nivelAtual <= 5 ? { nome: "Mutante 1", imagem: "imagens/mutantes/mutante1.jpg", ataque: 2500, defesa: 2000, tipo: "monstro" }
+                                : nivelAtual <= 10 ? { nome: "Mutante 2", imagem: "imagens/mutantes/mutante2.jpg", ataque: 3000, defesa: 2500, tipo: "monstro" }
+                                : { nome: "Mutante 3", imagem: "imagens/mutantes/mutante3.jpg", ataque: 3500, defesa: 2900, tipo: "monstro" };
+                    cemiterioOponente.push(mCampo);
+                    maoOponente.splice(maoOponente.indexOf(mMao), 1);
+                    monstrosOponente[monstrosOponente.indexOf(mCampo)] = { ...mutante, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
+                };
                 usou = true;
             }
         }
 
         if (usou) {
-            maoOponente.splice(maoOponente.indexOf(esp), 1);
-            cemiterioOponente.push(esp);
+            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(resolve => {
+                animarAtivacaoCarta(esp, () => {
+                    logBatalha(msgIA, "info");
+                    if (acaoIA) acaoIA();
+                    if (!img.includes("bloqueio.jpg")) cemiterioOponente.push(esp);
+                    maoOponente.splice(maoOponente.indexOf(esp), 1);
+                    resolve();
+                }, "MÁQUINA ATIVA:");
+            });
             atualizarTela();
+            await new Promise(r => setTimeout(r, 1000));
         }
-    });
+    }
 
     // --- 2. INVOCAÇÃO DE MONSTROS ---
     let monstrosMao = maoOponente.filter(c => c.tipo === "monstro");
     if (monstrosMao.length > 0) {
+        await new Promise(r => setTimeout(r, 1200)); // Delay antes de invocar
+        
         // Tenta sacrifício primeiro
         let monSac = monstrosMao.filter(m => m.sacrifio > 0).sort((a,b) => b.ataque - a.ataque)[0];
         let monstrosNoCampo = monstrosOponente.filter(m => m !== null);
@@ -1022,7 +1055,6 @@ function turnoDaMaquina() {
         if (monSac && monstrosNoCampo.length >= monSac.sacrifio) {
             let sacrificados = monstrosNoCampo.sort((a,b) => a.ataque - b.ataque).slice(0, monSac.sacrifio);
             sacrificados.forEach(s => {
-                // --- REMOVER BLOQUEIO DA MÁQUINA SE O SACRIFICADO ESTIVER BLOQUEADO ---
                 if (s.bloqueado) {
                     const idxEsp = especiaisJogador.findIndex(e => e && e.vinculo === monstrosOponente.indexOf(s) && e.imagem.includes("bloqueio.jpg"));
                     if (idxEsp !== -1) {
@@ -1033,84 +1065,94 @@ function turnoDaMaquina() {
                 cemiterioOponente.push(s);
                 monstrosOponente[monstrosOponente.indexOf(s)] = null;
             });
-
-            // Som de sacrifício para a máquina
             tocarSom("efeitosonoros/sacrificio.ogg");
-
             let slot = monstrosOponente.findIndex(s => s === null);
             monstrosOponente[slot] = { ...monSac, modo: "ataque", revelada: true, jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
             tocarSom("efeitosonoros/carta.ogg");
             maoOponente.splice(maoOponente.indexOf(monSac), 1);
             logBatalha(`Máquina invocou por Sacrifício: ${monSac.nome}!`, "info");
         } else {
-            // Invocação Normal
             let monNorm = monstrosMao.filter(m => !m.sacrifio).sort((a,b) => b.ataque - a.ataque)[0];
             let slot = monstrosOponente.findIndex(s => s === null);
             if (monNorm && slot !== -1) {
-                // Inteligência de Modo: Se for robô ou forte, prefere ataque
-                let modoIA = "ataque";
+                let modoIA = "defesa";
                 const monstrosJogadorAtivos = monstrosJogador.filter(m => m !== null);
-                const monstrosMaisFortesQueEu = monstrosJogadorAtivos.filter(m => (m.modo === "ataque" ? m.ataque : m.defesa) > monNorm.ataque);
-                
-                // Se tiver 2 ou mais monstros mais fortes que o que vou invocar, coloco em defesa
-                if (monstrosMaisFortesQueEu.length >= 2 || vidaOponente < 1500) {
-                    modoIA = "defesa";
+                const monstroMaisForteJogador = monstrosJogadorAtivos.length > 0 
+                    ? monstrosJogadorAtivos.reduce((prev, current) => (prev.ataque > current.ataque) ? prev : current)
+                    : null;
+                if (!monstroMaisForteJogador || monNorm.ataque > (monstroMaisForteJogador.modo === 'ataque' ? monstroMaisForteJogador.ataque : monstroMaisForteJogador.defesa)) {
+                    modoIA = "ataque";
                 }
-                
                 monstrosOponente[slot] = { ...monNorm, modo: modoIA, revelada: (modoIA === "ataque"), jaAtacou: false, acabouDeSerInvocado: true, mudouPosicaoNesteTurno: false };
                 tocarSom("efeitosonoros/carta.ogg");
                 maoOponente.splice(maoOponente.indexOf(monNorm), 1);
+                if (modoIA === "ataque") logBatalha(`Máquina invocou ${monNorm.nome} em Modo de Ataque!`, "info");
+                else logBatalha(`Máquina invocou um monstro oculto em Modo de Defesa!`, "info");
             }
         }
         atualizarTela();
     }
 
-    setTimeout(() => {
-        // --- 3. FASE DE BATALHA E AJUSTE DE POSIÇÃO DA IA ---
-        // ... (lógica de posição) ...
-        monstrosOponente.forEach((m, idx) => {
-            if (m && m.modo === "defesa" && !m.acabouDeSerInvocado && !m.bloqueado) {
-                const monstrosJogadorAtivos = monstrosJogador.filter(mj => mj !== null);
-                const monstrosMaisFortesQueEu = monstrosJogadorAtivos.filter(mj => (mj.modo === "ataque" ? mj.ataque : mj.defesa) > m.ataque);
-                
-                if (monstrosMaisFortesQueEu.length < 2) {
-                    m.modo = "ataque";
-                    m.revelada = true;
-                    logBatalha(`Máquina mudou ${m.nome} para modo de ATK!`, "info");
-                }
+    // --- 3. FASE DE BATALHA (SEQUENCIAL) ---
+    await new Promise(r => setTimeout(r, 1500)); // Delay maior antes de começar a atacar
+    
+    // Antes de atacar, ajusta posições de quem já estava no campo
+    monstrosOponente.forEach((m) => {
+        if (m && !m.acabouDeSerInvocado && !m.bloqueado && !m.mudouPosicaoNesteTurno) {
+            const monstrosJogadorAtivos = monstrosJogador.filter(mj => mj !== null);
+            const podeVencerAlguem = monstrosJogadorAtivos.some(mj => m.ataque > (mj.modo === "ataque" ? mj.ataque : mj.defesa));
+            
+            if (m.modo === "defesa" && podeVencerAlguem) {
+                m.modo = "ataque";
+                m.revelada = true;
+                m.mudouPosicaoNesteTurno = true;
+            } else if (m.modo === "ataque" && !podeVencerAlguem && monstrosJogadorAtivos.length > 0) {
+                m.modo = "defesa";
+                m.mudouPosicaoNesteTurno = true;
             }
-        });
+        }
+    });
 
-        monstrosOponente.forEach((m, idx) => {
-            if (m && m.modo === "ataque" && !m.jaAtacou && !m.bloqueado && !m.acabouDeSerInvocado && totalTurnosPartida > 0) {
-                let alvosValidos = monstrosJogador.map((mj, i) => mj ? { ...mj, originalIdx: i } : null).filter(v => v !== null);
-                
-                if (alvosValidos.length === 0) {
-                    tocarSom("efeitosonoros/ataque.ogg");
+    let atacantesFinais = monstrosOponente.filter(m => m && m.modo === "ataque" && !m.jaAtacou && !m.bloqueado && !m.acabouDeSerInvocado && totalTurnosPartida > 0);
+    
+    async function processarAtaquesSequencialmente(lista) {
+        for (const m of lista) {
+            let idx = monstrosOponente.indexOf(m);
+            let alvosValidos = monstrosJogador.map((mj, i) => mj ? { ...mj, originalIdx: i } : null).filter(v => v !== null);
+            
+            if (alvosValidos.length === 0) {
+                tocarSom("efeitosonoros/ataque.ogg");
+                await new Promise(resolve => {
                     animarAtaque(idx, null, false, () => {
                         alterarVida("jogador", vidaJogador - m.ataque);
-                        logBatalha(`Máquina atacou direto! -${m.ataque} LP`, "dano");
+                        logBatalha(`Máquina atacou direto com ${m.nome}! -${m.ataque} LP`, "dano");
                         m.jaAtacou = true;
+                        resolve();
                     });
-                } else {
-                    let alvosVenciveis = alvosValidos.filter(alvo => m.ataque > (alvo.modo === "ataque" ? alvo.ataque : alvo.defesa));
-                    if (alvosVenciveis.length > 0) {
-                        alvosVenciveis.sort((a,b) => (a.modo === "ataque" ? a.ataque : a.defesa) - (b.modo === "ataque" ? b.ataque : b.defesa));
-                        const alvoEscolhido = alvosVenciveis[alvosVenciveis.length-1];
-                        tocarSom("efeitosonoros/ataque.ogg");
+                });
+            } else {
+                let alvosVenciveis = alvosValidos.filter(alvo => m.ataque > (alvo.modo === "ataque" ? alvo.ataque : alvo.defesa));
+                if (alvosVenciveis.length > 0) {
+                    alvosVenciveis.sort((a,b) => (a.modo === "ataque" ? a.ataque : a.defesa) - (b.modo === "ataque" ? b.ataque : b.defesa));
+                    const alvoEscolhido = alvosVenciveis[alvosVenciveis.length-1];
+                    tocarSom("efeitosonoros/ataque.ogg");
+                    await new Promise(resolve => {
                         animarAtaque(idx, alvoEscolhido.originalIdx, false, () => {
                             resolverCombate(idx, alvoEscolhido.originalIdx, false);
+                            m.jaAtacou = true;
+                            resolve();
                         });
-                    }
+                    });
+                } else {
+                    m.jaAtacou = true;
                 }
             }
-        });
+            await new Promise(r => setTimeout(r, 1000)); // Delay entre ataques aumentado para 1s
+        }
+        finalizarTurnoMaquina();
+    }
 
-        setTimeout(() => {
-            // --- 4. FIM DO TURNO DA MÁQUINA ---\
-            finalizarTurnoMaquina();
-        }, 1000);
-    }, 1000);
+    processarAtaquesSequencialmente(atacantesFinais);
 }
 
 function verificarFimJogo() {
@@ -1325,7 +1367,8 @@ function renderLinha(id, lista, isJogador, tipoLinha) {
         const div = document.createElement("div");
         div.className = "slot";
         if (c) {
-            const imgPath = (c.revelada || isJogador) ? c.imagem : "imagens/back.jpg";
+            const ehOculto = !isJogador && !c.revelada;
+            const imgPath = ehOculto ? "imagens/back.jpg" : c.imagem;
             if (c.modo === "defesa") div.classList.add("modo-defesa");
             
             const img = document.createElement("img");
@@ -1333,14 +1376,31 @@ function renderLinha(id, lista, isJogador, tipoLinha) {
             img.className = "carta-img";
             div.appendChild(img);
 
-            if (tipoLinha === "combate" && (c.revelada || isJogador)) {
-                // Indicador de Stance (ATK/DEF)
-                const stance = document.createElement("div");
-                stance.className = `stance-indicator ${c.modo === 'ataque' ? 'atk' : 'def'}`;
-                stance.innerText = c.modo === 'ataque' ? 'A' : 'D';
-                div.appendChild(stance);
+            if (tipoLinha === "combate") {
+                // Indicador de Stance (A/D) - Só mostra se não for oculto ou se for do jogador
+                if (!ehOculto) {
+                    const stance = document.createElement("div");
+                    stance.className = `stance-indicator ${c.modo === 'ataque' ? 'atk' : 'def'}`;
+                    stance.innerText = c.modo === 'ataque' ? 'A' : 'D';
+                    div.appendChild(stance);
 
-                // Efeito de Bloqueio
+                    // Stats de ATK/DEF
+                    const status = document.createElement("div");
+                    status.className = "status-dual";
+                    status.innerHTML = `
+                        <div class="stat-box">
+                            <span class="stat-label">ATK</span>
+                            <span class="stat-value atk">${c.ataque}</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">DEF</span>
+                            <span class="stat-value def">${c.defesa}</span>
+                        </div>
+                    `;
+                    div.appendChild(status);
+                }
+
+                // Efeito de Bloqueio (sempre mostra se bloqueado)
                 if (c.bloqueado) {
                     const efeito = document.createElement("div");
                     efeito.className = "bloqueado-effect";
@@ -1351,24 +1411,9 @@ function renderLinha(id, lista, isJogador, tipoLinha) {
                     contador.innerText = c.turnosBloqueio;
                     div.appendChild(contador);
                 }
-                
-                // Stats de ATK/DEF
-                const status = document.createElement("div");
-                status.className = "status-dual";
-                status.innerHTML = `
-                    <div class="stat-box">
-                        <span class="stat-label">ATK</span>
-                        <span class="stat-value atk">${c.ataque}</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-label">DEF</span>
-                        <span class="stat-value def">${c.defesa}</span>
-                    </div>
-                `;
-                div.appendChild(status);
             }
             
-            if (tipoLinha === "suporte" && c.revelada && c.imagem.includes("bloqueio.jpg")) {
+            if (tipoLinha === "suporte" && !ehOculto && c.imagem.includes("bloqueio.jpg")) {
                 const tag = document.createElement("div");
                 tag.className = "alvo-tag";
                 tag.innerText = `ALVO: ${c.vinculo + 1}`;
@@ -1537,13 +1582,20 @@ function ativarEfeitoEspecialCampo(idx) {
 }
 
 // --- FUNÇÃO PARA ANIMAÇÃO DE ATIVAÇÃO DE CARTA ---
-function animarAtivacaoCarta(carta, callback) {
+function animarAtivacaoCarta(carta, callback, titulo = "") {
     const overlay = document.createElement("div");
-    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:20000; pointer-events:none;";
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:20000; pointer-events:none; font-family:'Cinzel', serif;";
     
+    if (titulo) {
+        const text = document.createElement("div");
+        text.style = "color:gold; font-size:24px; font-weight:bold; margin-bottom:20px; text-shadow:0 0 10px gold; animation: fadeIn 0.5s;";
+        text.innerText = titulo;
+        overlay.appendChild(text);
+    }
+
     const img = document.createElement("img");
     img.src = carta.imagem;
-    img.style = "width:200px; height:280px; border:4px solid gold; border-radius:10px; box-shadow:0 0 50px gold; transform:scale(0); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);";
+    img.style = "width:220px; height:310px; border:4px solid gold; border-radius:10px; box-shadow:0 0 50px gold; transform:scale(0); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);";
     
     overlay.appendChild(img);
     document.body.appendChild(overlay);
@@ -1552,26 +1604,27 @@ function animarAtivacaoCarta(carta, callback) {
     void img.offsetWidth;
     
     // Inicia zoom in
-    img.style.transform = "scale(1.2)";
+    img.style.transform = "scale(1.1)";
     tocarSom("efeitosonoros/carta.ogg");
     
     setTimeout(() => {
         // Zoom out e some
-        img.style.transition = "transform 0.3s ease-in, opacity 0.3s ease-in";
-        img.style.transform = "scale(2)";
+        img.style.transition = "transform 0.4s ease-in, opacity 0.4s ease-in";
+        img.style.transform = "scale(1.5)";
         img.style.opacity = "0";
+        if (titulo) overlay.firstChild.style.opacity = "0";
         
         setTimeout(() => {
             if (overlay.parentNode) document.body.removeChild(overlay);
             if (callback) callback();
-        }, 300);
-    }, 1000);
+        }, 400);
+    }, 1200); // Aumentado para 1.2s para dar tempo de ver a carta
 }
 
 function ativarEfeitoEspecial(cartaParaUsar, callbackRemover) {
     animarAtivacaoCarta(cartaParaUsar, () => {
         executarAtivacaoEspecial(cartaParaUsar, callbackRemover);
-    });
+    }, "VOCÊ ATIVA:");
 }
 
 function executarAtivacaoEspecial(cartaParaUsar, callbackRemover) {
@@ -1581,31 +1634,36 @@ function executarAtivacaoEspecial(cartaParaUsar, callbackRemover) {
     if (img.includes("equipar.jpg")) {
         let alvos = monstrosJogador.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);
         if (alvos.length === 0) return alert("Sem monstros no campo para equipar!");
-        const opcoes = [
-            { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800, nivelReq: 1 },
-            { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000, nivelReq: 2 },
-            { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200, nivelReq: 3 },
-            { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500, nivelReq: 4 },
-            { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800, nivelReq: 5 }
-        ].filter(r => nivelAtual >= r.nivelReq);
-        if (opcoes.length === 0) return alert("Nenhum robô disponível no seu nível.");
+        
+        // Modificado: Agora só oferece o robô do nível atual (ou o 5º se nível > 5)
+        const roboNivel = nivelAtual <= 5 ? nivelAtual : 5;
+        const robos = [
+            { nome: "Robô A1", imagem: "imagens/robos/robo1.jpg", ataque: 2000, defesa: 1800 },
+            { nome: "Robô A2", imagem: "imagens/robos/robo2.jpg", ataque: 2200, defesa: 2000 },
+            { nome: "Robô A3", imagem: "imagens/robos/robo3.jpg", ataque: 2500, defesa: 2200 },
+            { nome: "Robô A4", imagem: "imagens/robos/robo4.jpg", ataque: 2800, defesa: 2500 },
+            { nome: "Robô A5", imagem: "imagens/robos/robo5.jpg", ataque: 3100, defesa: 2800 }
+        ];
+        
+        const r = robos[roboNivel - 1];
+        
         mostrarSelecao("ESCOLHA O MONSTRO", alvos.map(a => a.nome), (selMon) => {
             const mIdx = alvos[selMon].i;
-            mostrarSelecao("ESCOLHA O ROBÔ", opcoes.map(o => o.nome), (selRobo) => {
-                const r = opcoes[selRobo];
-                
-                // Som de equipar só depois de escolher o robô/monstro
-                tocarSom("efeitosonoros/equipar.ogg");
+            
+            // Som de equipar só depois de escolher o monstro
+            tocarSom("efeitosonoros/equipar.ogg");
 
-                monstrosJogador[mIdx].imagem = r.imagem;
-                monstrosJogador[mIdx].nome = r.nome;
-                monstrosJogador[mIdx].ataque = r.ataque;
-                monstrosJogador[mIdx].defesa = r.defesa;
-                const removida = callbackRemover();
-                if (removida) cemiterioJogador.push(removida);
-                logBatalha(`Transformação em ${r.nome}`, "info");
-                atualizarTela();
-            });
+            const monstroAlvo = monstrosJogador[mIdx];
+            logBatalha(`Você equipou seu ${monstroAlvo.nome} e agora é uma super máquina: ${r.nome}!`, "info");
+
+            monstrosJogador[mIdx].imagem = r.imagem;
+            monstrosJogador[mIdx].nome = r.nome;
+            monstrosJogador[mIdx].ataque = r.ataque;
+            monstrosJogador[mIdx].defesa = r.defesa;
+            
+            const removida = callbackRemover();
+            if (removida) cemiterioJogador.push(removida);
+            atualizarTela();
         });
     } else if (img.includes("powerup")) {
         let alvos = monstrosJogador.map((m, i) => m ? {i, nome: m.nome} : null).filter(Boolean);

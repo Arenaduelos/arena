@@ -229,8 +229,24 @@ body {
 .grid { 
     display: grid; 
     grid-template-columns: repeat(3, var(--card-w)); 
-    gap: 8px; 
+    gap: 8vw; /* Espaçamento responsivo para mobile */
     justify-content: center;
+} 
+
+@media (min-width: 600px) {
+    .grid { gap: 40px; } /* Espaçamento fixo para desktop */
+}
+
+/* Ajuste na rotação para não quebrar o layout */
+.modo-defesa {
+    transform: rotate(90deg);
+    z-index: 5;
+}
+
+/* Garante que o container da carta respeite o espaço ao rotacionar */
+.slot {
+    position: relative;
+    transition: transform 0.3s ease;
 } 
 
 /* Barra de Ação Central e Botões de Ícone */ 
@@ -592,6 +608,32 @@ body {
     font-weight: bold;
     border: 1px solid #fff;
     z-index: 20;
+}
+
+/* Indicador de Dano/Cura Flutuante */
+.floating-number {
+    position: fixed;
+    font-size: 2.5rem;
+    font-weight: 900;
+    pointer-events: none;
+    z-index: 10000;
+    animation: float-up 1.5s ease-out forwards;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8), 2px 2px 0 #000;
+}
+
+.floating-number.dano {
+    color: #ff3333;
+}
+
+.floating-number.cura {
+    color: #33ff33;
+}
+
+@keyframes float-up {
+    0% { transform: translateY(0) scale(0.5); opacity: 0; }
+    20% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+    80% { transform: translateY(-80px) scale(1); opacity: 1; }
+    100% { transform: translateY(-100px) scale(0.8); opacity: 0; }
 }
 
 

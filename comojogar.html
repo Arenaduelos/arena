@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como Jogar - Mini Duel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <style>
+        .instrucoes-container {
+            background: #c2a679;
+            padding: 30px;
+            border: 10px solid #3d2b1f;
+            border-image: url('https://www.transparentpng.com/download/border/9O0Zz1-wooden-border-frame-transparent.png') 30 stretch;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            width: 90%;
+            max-width: 800px;
+            margin: 40px auto;
+            border-radius: 5px;
+            color: #1a0f08;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        h2 { border-bottom: 2px solid #3d2b1f; margin-top: 25px; color: #3d2b1f; }
+        p, li { line-height: 1.6; margin-bottom: 10px; font-weight: bold; }
+        .btn-voltar {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 15px;
+            background: linear-gradient(to bottom, #4a4a4a 0%, #2a2a2a 100%);
+            color: #ffd700;
+            border: 2px solid #ffd700;
+            text-align: center;
+            text-decoration: none;
+            font-weight: bold;
+            font-family: 'Cinzel', serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="instrucoes-container">
+        <h1>Como Jogar Mini Duel</h1>
+        
+        <h2>Objetivo</h2>
+        <p>Reduza os Pontos de Vida (LP) do seu oponente a zero para vencer o duelo!</p>
+
+        <h2>Turnos</h2>
+        <ul>
+            <li><strong>Compra:</strong> No início do seu turno, você compra uma carta do deck.</li>
+            <li><strong>Invocação:</strong> Você pode invocar um monstro por turno em modo de Ataque ou Defesa.</li>
+            <li><strong>Batalha:</strong> Monstros em modo de Ataque podem atacar monstros do oponente ou diretamente se o campo estiver vazio.</li>
+        </ul>
+
+        <h2>Tipos de Cartas</h2>
+        <ul>
+            <li><strong>Monstros Comuns:</strong> Usados para atacar e defender.</li>
+            <li><strong>Sacrifícios:</strong> Monstros poderosos que exigem o sacrifício de outros monstros no campo para serem invocados.</li>
+            <li><strong>Especiais:</strong> Cartas com efeitos únicos como cura, aumento de dano ou bloqueio de inimigos.</li>
+        </ul>
+
+        <h2>Modos de Posição</h2>
+        <ul>
+            <li><strong>Ataque (A):</strong> Usa o valor de ATK para causar dano.</li>
+            <li><strong>Defesa (D):</strong> Usa o valor de DEF para proteger seus LP. Se destruído em defesa, você não perde vida.</li>
+        </ul>
+
+        <a href="javascript:history.back()" class="btn-voltar">VOLTAR</a>
+    </div>
+</body>
+</html>
